@@ -6,9 +6,7 @@ services:
     image: toposcale-rila-pirin
     container_name: toposcale-rila-pirin
     volumes:
-      - ./inputs:/app/inputs
-      - ./outputs:/app/outputs
-      - ./config:/app/config
+      - .:/app
       - ~/.cdsapirc:/root/.cdsapirc:ro
       - ./docker/state/bash_history:/root/.bash_history_persist
     tty: true
