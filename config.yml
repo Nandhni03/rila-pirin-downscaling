@@ -40,7 +40,7 @@ climate:
     zarr_store: ERA5.zarr
 
 dem:
-  path: inputs/dem
+  path:
   file: rila_pirin_DEM_FINAL_32634.tif
   epsg: 32634
   horizon_increments: 10
