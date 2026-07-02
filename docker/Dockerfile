@@ -23,11 +23,12 @@ RUN pip install --no-cache-dir TopoPyScale
 # (2) np.reshape() on an Arrow-backed pandas string column, unsupported by NumPy directly
 RUN sed -i 's/mask = \[True\] \* len(df_param)/mask = pd.Series([True] * len(df_param), index=df_param.index)/' \
     /usr/local/lib/python3.13/site-packages/TopoPyScale/topoclass.py && \
-    sed -i "453s/np.reshape(df_param.point_name.values, shape,order='F')/np.reshape(np.asarray(df_param.point_name, dtype=object), shape, order='F')/" \
+    sed -i "s/np.reshape(df_param.point_name.values, shape,order='F')/np.reshape(np.asarray(df_param.point_name, dtype=object), shape, order='F')/g" \
     /usr/local/lib/python3.13/site-packages/TopoPyScale/topoclass.py
 
 ENV HISTFILE=/root/.bash_history_persist
 ENV HISTSIZE=10000
 ENV HISTFILESIZE=20000
+ENV HDF5_USE_FILE_LOCKING=FALSE
 
 CMD ["/bin/bash"]
