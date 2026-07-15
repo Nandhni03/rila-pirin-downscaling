@@ -4,11 +4,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
     cdo \
+    gdal-bin \
     libnetcdf-dev \
     libhdf5-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN cdo --version
+RUN gdalinfo --version
 
 WORKDIR /app
 
