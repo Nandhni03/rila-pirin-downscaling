@@ -1,0 +1,77 @@
+project:
+  name: Bulgaria Rila-Pirin Test Run
+  description: Single-day (2023-03-15, hourly) TopoPyScale test run for the Rila-Pirin thesis project, learning the pipeline end-to-end before the full multi-year run.
+  authors:
+    - Nandhni, MSc GIS, West University of Timisoara
+  date: 2026-07-16
+  directory: /app/bulgaria_rila_pirin
+  start: 2023-03-15
+  end: 2023-03-15
+  split:
+    IO: False
+    time: 1
+    space: None
+  climate: era5
+  extent:
+  parallelization:
+    downscaling_method: multicore
+    setting:
+      multicore:
+        CPU_cores: 20 # 4 otherwise, but on the linux computer i do have 21 cores
+      dask:
+        n_workers: 4
+        threads_per_worker: 1
+        memory_target_fraction: 0.95
+        memory_limit: 1.2GB
+
+climate:
+  precip_lapse_rate: True
+  era5:
+    path: inputs/climate/
+    product: reanalysis
+    timestep: 1H
+    plevels: [600,650,700,750,775,800,825,850,875,900,925,950,975,1000]
+    download_threads: 4
+    data_repository: cds
+    cds_output_format: netcdf
+    cds_download_format: unarchived
+    rm_daily: False
+    realtime: False
+    zarr_store: ERA5.zarr
+
+dem:
+  path:
+  file: rila_pirin_dem_25m_buffered_32634_bilinear_resampling.tif
+  epsg: 32634
+  horizon_increments: 10
+  solar_position_method: nrel_numpy
+
+sampling:
+  method: toposub
+  toposub:
+    clustering_method: minibatchkmean
+    n_clusters: 500  # PLACEHOLDER -- to be revised via search_number_of_clusters() before the real run
+    random_seed: 2
+    clustering_features: {'x':1, 'y':1, 'elevation':1, 'slope':1, 'aspect_cos':1, 'aspect_sin':1, 'svf':1}
+    clustering_mask: inputs/dem/mask.tif
+
+toposcale:
+  interpolation_method: idw
+  LW_terrain_contribution: True
+
+outputs:
+  directory: outputs
+  variables: all
+  file:
+    clean_outputs: False
+    clean_FSM: True
+    df_centroids: df_centroids.pck
+    ds_param: ds_param.nc
+    ds_solar: ds_solar.nc
+    da_horizon: da_horizon.nc
+    landform: landform.tif
+    downscaled_pt: down_pt_*.nc
+    zarr_store: down.zarr
+
+clean_up:
+  rm_tmp_dirs: True
