@@ -48,7 +48,18 @@
 - [x] Confirm TopoPyScale's path convention for `dem.file`/`dem.path`: confirmed in `topoclass.py` — if `dem.path` is blank in config.yml, it defaults to `<project.directory>/inputs/dem/`, and critically, if the DEM isn't found there, TopoPyScale will silently try to **auto-download a Copernicus DEM from the internet** instead via `fetch_dem()`. So the DEM MUST live at `inputs/dem/`, not directly under `inputs/`.
 - [x] Moved DEM (+ .aux.xml) into `bulgaria_rila_pirin/inputs/dem/`. Mask stays at `inputs/mask/` (untouched, not part of this convention).
 - [ ] Rasterize the mask GeoJSON into a `mask.tif` aligned pixel-for-pixel with the DEM (same bounds/resolution) using `gdal_rasterize`, for use as `sampling.toposub.clustering_mask` — restricts which pixels become cluster centroids to the true AOI rather than the buffer.
-- [x] Wrote `bulgaria_rila_pirin/config.yml` (adapted from the working root config.yml). `n_clusters: 500` is a PLACEHOLDER pending the objective cluster-count search below — update it before the real run.
+- [x] Wrote `bulgaria_rila_pirin/config.yml` (adapted from the working root config.yml).
+- [x] Ran `compute_dem_param()` (full 25m resolution, ~24.36M pixels, ~13.95M inside mask AOI) — took a while (SVF computation is the slow part) but completed and **cached to `outputs/ds_param.nc`** (won't need to recompute for the real pipeline run).
+- [x] Ran TopoPyScale's own `search_number_of_clusters()` (library function, no custom subsampling — full masked population) across k=[100,300,500,700,900]. Results (`n_clusters_search_results` — not saved to a file, just printed; rerun the heredoc from this session's history if needed again):
+  ```
+  n_clusters   wcss_score  db_score      ch_score  rmse_elevation
+         100 1.618099e+07 13.70    736534.78       244.51
+         300 1.008343e+07 19.18    446007.63       195.49
+         500 8.058977e+06 16.93    357954.56       175.74
+         700 6.984001e+06 19.36    299372.90       164.03
+         900 6.294301e+06 17.21    261584.92       156.86
+  ```
+  **Decision: n_clusters = 500.** Reasoning: Davies-Bouldin is non-monotonic/noisy (terrain features are a continuum, not discrete groups — DB isn't a reliable signal here). Calinski-Harabasz decreases monotonically with k as a known mechanical artifact of its formula, not a real "smaller is better" signal — also not reliable. **Elevation RMSE is the metric that matters** (translates ~directly to temperature error via lapse rate) and shows clear diminishing returns: gains of 49m/20m/12m/7m per step — most of the achievable improvement happens by k=500, and it matches the root project's already-tested config for comparability. **STILL NEEDS: update config.yml's n_clusters from 500 (currently already a placeholder value, now also the final decision — but re-verify the line doesn't still say "PLACEHOLDER" in a comment) before writing pipeline.py.**
 - [ ] Write a small standalone script to: instantiate `Topoclass`, run `compute_dem_param()`, take a random subsample of the resulting terrain-parameter dataframe, run `search_number_of_clusters()` over a candidate range, and report the score table — to pick `n_clusters` objectively before committing to a full run.
 - [ ] Once `n_clusters` is chosen, write `bulgaria_rila_pirin/pipeline.py` (compute_dem_param → extract_topo_param → compute_solar_geometry → compute_horizon → get_era5 → downscale_climate).
 - [ ] Run the pipeline stage by stage inside the container, verifying outputs at each step (this will likely take a while at full 25m resolution — budget real time for `compute_dem_param()`/`compute_horizon()` especially).
