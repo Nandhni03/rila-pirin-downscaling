@@ -94,13 +94,7 @@ matching the home machine's native Ubuntu version.
   first task next session.
 
 ### Known issues still open (found this session, not yet fixed)
-- `config.yml`'s `dem.file` still references the old filename
-  `rila_pirin_DEM_FINAL_32634.tif` — actual file on disk is
-  `rila_pirin_dem_25m_buffered_32634_bilinear_resampling.tif`. Must fix
-  before any pipeline run or it will fail immediately.
-- `config.yml`'s `plevels` only lists 700-1000 hPa — this file's own
-  prose decision above says the range should extend to 600 hPa. Reconcile
-  which is actually intended.
+- ~~`dem.file`/`plevels` mismatch~~ — RE-VERIFIED 2026-07-30, both already correct in config.yml. Earlier note in this file was stale.
 - `bulgaria_rila_pirin/pipeline.py` is still empty. The **repo-root**
   `pipeline.py` (different folder, older/generic setup) has a complete,
   correct 6-step template — adapt that for `bulgaria_rila_pirin/`, pointing
@@ -112,7 +106,6 @@ matching the home machine's native Ubuntu version.
 ### Next session — pick up here
 1. Copy `ds_param.nc` from Drive into `bulgaria_rila_pirin/outputs/` on
    this machine.
-2. Fix `dem.file` and `plevels` in `config.yml`.
 3. Verify `mask.tif`.
 4. Write `bulgaria_rila_pirin/pipeline.py`.
 5. Then proceed with the original checklist below.
