@@ -64,3 +64,55 @@
 - [ ] Once `n_clusters` is chosen, write `bulgaria_rila_pirin/pipeline.py` (compute_dem_param → extract_topo_param → compute_solar_geometry → compute_horizon → get_era5 → downscale_climate).
 - [ ] Run the pipeline stage by stage inside the container, verifying outputs at each step (this will likely take a while at full 25m resolution — budget real time for `compute_dem_param()`/`compute_horizon()` especially).
 - [ ] Extract the downscaled `t` (air temperature) variable at hourly timesteps for 2016-08-30 from the final output and sanity-check it.
+
+## Session update — 2026-07-30 (faculty machine, ICAM-B-104)
+
+**Machine context**: this session was run on the faculty lab machine
+`ICAM-B-104` (Windows 11, build 10.0.26100, i9-13900KF), not the home
+machine the original Docker setup was built on. WSL2 Ubuntu-24.04.4 LTS,
+matching the home machine's native Ubuntu version.
+
+### What got done this session
+- Full environment audit on this machine (Claude Code, VS Code, WSL, QGIS
+  versions — see SETUP.md).
+- Installed `gdal-bin` natively in WSL (GDAL 3.8.4) for host-side GIS work,
+  separate from the container's own GDAL (3.6.2).
+- Installed Docker fresh on this machine (`docker.io` via apt, then added
+  Docker's official repo to get `docker-compose-plugin`, which isn't in
+  Ubuntu's default repos).
+- Built the `toposcale-rila-pirin` image from scratch on this machine and
+  confirmed the container runs correctly (`docker compose up -d`,
+  `docker compose exec toposcale bash`), with the repo correctly
+  bind-mounted at `/app`.
+- Confirmed inside the container: TopoPyScale imports correctly (pip-installed,
+  not editable — separate from the editable fork install on the WSL host
+  used for library-code experimentation), GDAL present.
+- **Confirmed `ds_param.nc` does NOT exist on this machine** (not in the
+  container, not on the WSL host) — it only ever existed on the home
+  machine's Docker setup. Located a backup copy **on Google Drive**.
+  NOT yet copied into this machine's `bulgaria_rila_pirin/outputs/` —
+  first task next session.
+
+### Known issues still open (found this session, not yet fixed)
+- `config.yml`'s `dem.file` still references the old filename
+  `rila_pirin_DEM_FINAL_32634.tif` — actual file on disk is
+  `rila_pirin_dem_25m_buffered_32634_bilinear_resampling.tif`. Must fix
+  before any pipeline run or it will fail immediately.
+- `config.yml`'s `plevels` only lists 700-1000 hPa — this file's own
+  prose decision above says the range should extend to 600 hPa. Reconcile
+  which is actually intended.
+- `bulgaria_rila_pirin/pipeline.py` is still empty. The **repo-root**
+  `pipeline.py` (different folder, older/generic setup) has a complete,
+  correct 6-step template — adapt that for `bulgaria_rila_pirin/`, pointing
+  at `bulgaria_rila_pirin/config.yml` and run from within that folder.
+- `bulgaria_rila_pirin/inputs/dem/mask.tif` exists on disk but hasn't been
+  verified as the real rasterized AOI mask (vs. a stale/empty artifact) —
+  check with `gdalinfo` before trusting it as `clustering_mask`.
+
+### Next session — pick up here
+1. Copy `ds_param.nc` from Drive into `bulgaria_rila_pirin/outputs/` on
+   this machine.
+2. Fix `dem.file` and `plevels` in `config.yml`.
+3. Verify `mask.tif`.
+4. Write `bulgaria_rila_pirin/pipeline.py`.
+5. Then proceed with the original checklist below.
