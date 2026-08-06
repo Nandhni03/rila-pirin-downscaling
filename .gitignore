@@ -10,5 +10,18 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .DS_Store
+# Large local geodata and runtime artifacts
+*.tif
+*.tiff
+*.nc
+*.aux.xml
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.qpj
+*.zip
+*.zarr/
 bulgaria_rila_pirin/data/
 bulgaria_rila_pirin/outputs/
