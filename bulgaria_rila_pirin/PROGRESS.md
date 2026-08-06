@@ -109,3 +109,9 @@ matching the home machine's native Ubuntu version.
 3. Verify `mask.tif`.
 4. Write `bulgaria_rila_pirin/pipeline.py`.
 5. Then proceed with the original checklist below.
+
+## Status update — 2026-08-06
+
+- The repository was reset back to the remote `main` branch after the earlier GitHub push failure caused by large geodata files.
+- The large local DEM/NetCDF artifacts remain on disk for local use, but they are now covered by the repository ignore rules so they will not be pushed accidentally again.
+- The next step is to keep the workflow changes small and commit only non-data files such as the progress log, Docker config, and any scripts or notes.
