@@ -25,3 +25,6 @@ __pycache__/
 *.zarr/
 bulgaria_rila_pirin/data/
 bulgaria_rila_pirin/outputs/
+bulgaria_rila_pirin/outputs_points/
+*.pkl
+*.pckl

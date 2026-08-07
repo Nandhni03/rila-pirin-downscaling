@@ -7,7 +7,7 @@ services:
     container_name: toposcale-rila-pirin
     volumes:
       - .:/app
-      - ~/.cdsapirc:/root/.cdsapirc:ro
+      - /home/icam_labs/.cdsapirc.d/credentials:/root/.cdsapirc:ro
       - ./docker/state/bash_history:/root/.bash_history_persist
     tty: true
     stdin_open: true

@@ -29,7 +29,7 @@ climate:
   era5:
     path: inputs/climate/
     product: reanalysis
-    timestep: 1H
+    timestep: 1h
     plevels: [600,650,700,750,775,800,825,850,875,900,925,950,975,1000]
     download_threads: 4
     data_repository: cds
@@ -37,7 +37,7 @@ climate:
     cds_download_format: unarchived
     rm_daily: False
     realtime: False
-    zarr_store: ERA5.zarr
+    zarr_store: null
 
 dem:
   path:

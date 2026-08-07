@@ -1,0 +1,65 @@
+project:
+    name: Config for testing TopoPyScale with Github Actions
+    description: Downscaling for Finse, Benchmarking TopoPyScale
+    authors:
+        - Filhol S.
+        - Aalstad K.
+        - Fiddes J.
+    date: Nov 2021
+    directory: 
+    start: 2018-10-01
+    end: 2018-12-31
+    split:
+        IO: False
+        time: 1  # run indivudal batch in time
+        space: None  # to be implemented
+    extent: 
+    CPU_cores: 2
+    climate: era5
+    
+climate:
+    era5:
+        path: inputs/climate/
+        product: reanalysis
+        timestep: 1H
+        plevels: [700,750,800,850,900,950,1000]
+        download_threads: 12
+        realtime: False
+        data_repository: cds
+    precip_lapse_rate: True
+
+dem:
+    file: ASTER_Finse.tif
+    epsg: 32632
+    horizon_increments: 10
+
+sampling:
+    method: toposub
+    points:
+        csv_file: station_list.csv
+
+    toposub:
+        clustering_method: minibatchkmean
+        n_clusters: 5
+        random_seed: 2
+        clustering_features: {'x':1, 'y':1, 'elevation':1, 'slope':1, 'aspect_cos':1, 'aspect_sin':1, 'svf':1}
+
+toposcale:
+    interpolation_method: idw
+    pt_sampling_method: nearest
+    LW_terrain_contribution: True
+
+outputs:
+    directory: 
+    variables: all  # list or combination name
+    file:
+        clean_outputs: True
+        clean_FSM: True
+        df_centroids: df_centroids.pck
+        ds_param: ds_param.nc
+        ds_solar: ds_solar.nc
+        da_horizon: da_horizon.nc
+        landform: landform.tif
+        downscaled_pt: down_pt_*.nc
+clean_up:
+    delete_tmp_dirs: True
