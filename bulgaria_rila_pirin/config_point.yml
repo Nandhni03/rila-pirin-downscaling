@@ -1,9 +1,9 @@
 project:
-  name: Bulgaria Rila-Pirin Test Run
-  description: Single-day (2023-03-15, hourly) TopoPyScale test run for the Rila-Pirin thesis project, learning the pipeline end-to-end before the full multi-year run.
+  name: Bulgaria Rila-Pirin Test Run - Station Validation
+  description: Point-sampling downscaling at METER.AC station locations for 2023-03-15, to validate against observed hourly min/max/mean air temperature.
   authors:
     - Nandhni, MSc GIS, West University of Timisoara
-  date: 2026-07-16
+  date: 2026-08-07
   directory: /app/bulgaria_rila_pirin
   start: 2023-03-15
   end: 2023-03-15
@@ -17,7 +17,7 @@ project:
     downscaling_method: multicore
     setting:
       multicore:
-        CPU_cores: 20 # 4 otherwise, but on the linux computer i do have 21 cores
+        CPU_cores: 20
       dask:
         n_workers: 4
         threads_per_worker: 1
@@ -47,10 +47,13 @@ dem:
   solar_position_method: nrel_numpy
 
 sampling:
-  method: toposub
+  method: points
+  points:
+    csv_file: station_list.csv
+    name_column: stn_number
   toposub:
     clustering_method: minibatchkmean
-    n_clusters: 500  # PLACEHOLDER -- to be revised via search_number_of_clusters() before the real run
+    n_clusters: 500
     random_seed: 2
     clustering_features: {'x':1, 'y':1, 'elevation':1, 'slope':1, 'aspect_cos':1, 'aspect_sin':1, 'svf':1}
     clustering_mask: inputs/dem/mask.tif
@@ -60,7 +63,7 @@ toposcale:
   LW_terrain_contribution: True
 
 outputs:
-  directory: outputs
+  directory: outputs_points
   variables: all
   file:
     clean_outputs: False

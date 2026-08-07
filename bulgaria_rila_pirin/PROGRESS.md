@@ -114,4 +114,743 @@ matching the home machine's native Ubuntu version.
 
 - The repository was reset back to the remote `main` branch after the earlier GitHub push failure caused by large geodata files.
 - The large local DEM/NetCDF artifacts remain on disk for local use, but they are now covered by the repository ignore rules so they will not be pushed accidentally again.
+- The current one-day test run is configured to use 20 CPU cores for the downscaling step, as defined in the project config.
 - The next step is to keep the workflow changes small and commit only non-data files such as the progress log, Docker config, and any scripts or notes.
+- The one-day trial will start with the 25 m DEM and the 2023-03-15 test date, then we will inspect the outputs before deciding whether to switch to the 10 m DEM.
+- ERA5 download and yearly merge have now succeeded after creating the writable yearly climate output directory inside the container.
+- The climate forcing files are now present at `bulgaria_rila_pirin/inputs/climate/daily/` and `bulgaria_rila_pirin/inputs/climate/yearly/`.
+- The next command to continue the workflow beyond ERA5 is:
+
+```bash
+cd /home/icam_labs/nandhni/downscaling-topopyscale-project/rila-pirin-downscaling
+docker compose exec -T toposcale bash -lc '
+cd /app &&
+python - <<'"'"'PY'"'"'
+from TopoPyScale import topoclass as tc
+mp = tc.Topoclass("/app/bulgaria_rila_pirin/config.yml")
+mp.compute_dem_param()
+mp.extract_topo_param()
+mp.compute_solar_geometry()
+mp.compute_horizon()
+mp.downscale_climate()
+mp.to_netcdf()
+print("Pipeline finished")
+PY
+'
+```
+
+- While that long run is in progress, the easiest monitoring command is:
+
+```bash
+cd /home/icam_labs/nandhni/downscaling-topopyscale-project/rila-pirin-downscaling
+find bulgaria_rila_pirin/outputs -maxdepth 2 -type f 2>/dev/null | sort
+```
+
+- If the outputs folder stays empty for a while, that means the heavy terrain/horizon/downscaling part is still running; once files appear, we can inspect them and decide whether to keep the 25 m DEM baseline or switch to the 10 m DEM for the next round.
+
+## Session update — 2026-08-06 (continued, Claude Code session)
+
+**Goal for this session**: get the full 2023-03-15 one-day pipeline to a finished downscaled air-temperature result within a few hours, unattended if needed.
+
+### Found: a full pipeline run already in progress
+On starting this session, a pipeline (the exact command block above) was already
+running inside the container (started ~15:21, PID 46883 on host / 344 in
+container), using ~110% CPU and ~4.3GB RSS, but with `bulgaria_rila_pirin/outputs/downscaled/`
+and `outputs/tmp/` both still empty after 10 minutes.
+
+### Bug #1 found and fixed: `ds_param.nc` cache was in the wrong folder
+- `bulgaria_rila_pirin/inputs/mask/ds_param.nc` (161MB, dated 14:19, i.e. from
+  earlier this session/day) turned out to be a **valid, complete cached
+  `compute_dem_param()` result** — verified via `xarray`: dims `(y: 5079, x: 4797)`,
+  elevation range 48.28m–2905.02m, variables `elevation/slope/aspect/aspect_cos/aspect_sin/svf`.
+  This matches this project's DEM exactly (per the "Decisions made so far" section above).
+- TopoPyScale's actual cache-lookup path (confirmed by reading
+  `topoclass.py` inside the installed package) is
+  `<project.directory>/outputs/ds_param.nc` (from `config.yml`'s
+  `outputs.directory: outputs` + `outputs.file.ds_param: ds_param.nc`) —
+  **not** `inputs/mask/`. Because the file was in the wrong place, the
+  already-running pipeline was silently ignoring the cache and recomputing
+  `compute_dem_param()` (the slow SVF-over-24M-pixels step) from scratch.
+- **Fix applied**: killed the in-progress run (`kill -TERM` on the container
+  python process; confirmed gone), then `mv`'d the file to
+  `bulgaria_rila_pirin/outputs/ds_param.nc`. Relaunched the pipeline — log
+  confirmed `---> Dataset ds_param.nc found.`, i.e. `compute_dem_param()` was
+  correctly skipped on the second run.
+
+### Bug #2 found and fixed: `mask.tif` bounds didn't exactly match the DEM
+- The relaunched run immediately failed inside `extract_topo_param()` →
+  `extract_topo_cluster_param()` with:
+  ```
+  ValueError: The GeoTIFFS of the DEM and the MASK need to have the same bounds/resolution.
+  mask bounds: (649842.729, ...) | dem bounds: (649842.7286942997, ...)
+  ```
+  i.e. `inputs/dem/mask.tif` (the file flagged as "not yet verified" in the
+  checklist above) had bounds rounded to 3 decimal places (from however it was
+  originally rasterized — likely a `gdal_rasterize -te` call with manually
+  copy-pasted, rounded corner coordinates), while the DEM's real affine
+  transform carries full floating-point precision. The mismatch was only
+  ~0.0007m (well under a millimeter) but TopoPyScale's check is an exact `==`
+  comparison, so it failed hard.
+- **Fix applied**: backed up the old file to `inputs/dem/mask.tif.bak`, then
+  wrote `bulgaria_rila_pirin/fix_mask.py` (uses `rasterio` to read the DEM's
+  exact `transform`/`shape`/`crs` and `rasterio.features.rasterize` the AOI
+  GeoJSON — `inputs/mask/rila_pirin_PERFECT_RECTANGLE_32634.geojson` — directly
+  onto that grid, guaranteeing byte-identical bounds/resolution by
+  construction rather than by re-deriving numbers). Verified after
+  regeneration: `bounds match exactly: True`, `resolution match: True`, and
+  the AOI pixel count (13,945,288) matches the figure already recorded above
+  ("~13.95M inside mask AOI") — confirms the new mask is correct, not just
+  bounds-compatible.
+- Relaunched the pipeline a third time (this is the run currently in
+  progress/being monitored — see below).
+
+### Process notes for future sessions
+- **Kill a stuck/wasteful run**: find the container-internal PID with
+  `docker compose exec -T toposcale bash -lc 'for p in /proc/[0-9]*; do ...
+  cat $p/cmdline; done'` (no `ps`/`pgrep` inside this container image), then
+  `kill -TERM <pid>` inside the same `docker compose exec`.
+- **Always place cache files under `bulgaria_rila_pirin/outputs/`**, matching
+  `config.yml`'s `outputs.directory`/`outputs.file.*` keys exactly — not under
+  `inputs/`.
+- If `extract_topo_param()` ever complains about mask/DEM bounds again (e.g.
+  after regenerating either file), rerun `fix_mask.py` rather than
+  hand-rolling `gdal_rasterize -te/-tr` flags — exact float equality is
+  required, and copy-pasted/rounded corner coordinates will not satisfy it.
+- Current pipeline log (this session): `pipeline_run2.log` in the Claude Code
+  scratchpad dir (not in the repo). A background `Monitor` is watching it for
+  progress markers, warnings, errors, and the final `Pipeline finished` line.
+
+### Bug #3: pandas frequency string `1H` no longer valid
+- 3rd attempt got through `compute_dem_param()` (cache hit) and
+  `extract_topo_param()` (bounds check passed after the mask fix), but failed
+  entering `compute_solar_geometry()` with
+  `ValueError: Invalid frequency: H ... Did you mean h?` — the installed
+  pandas version deprecated the uppercase `'H'` hourly-frequency alias.
+- Root cause traced to `config.yml`'s `climate.era5.timestep: 1H`, which
+  `topoclass.py` passes straight through to `pd.date_range(freq=tstep)` in
+  **multiple** places (`solar_geom.get_solar_geom`, `compute_horizon`,
+  `downscale_climate` — confirmed via `grep` on `topoclass.py`, lines
+  533/549/626/674/697), so this would have recurred at every one of those
+  steps if not fixed centrally.
+- **Fix**: changed `config.yml` `timestep: 1H` → `timestep: 1h` (lowercase).
+  4th attempt got past solar geometry (`ds_solar.nc` saved) and into
+  `compute_horizon()` cleanly.
+
+### Bug #4: `compute_horizon()` succeeded; `downscale_climate()` looked for a Zarr store that doesn't exist
+- 4th attempt: `compute_horizon()` completed and cached
+  (`outputs/da_horizon.nc`, ~7GB, 10° azimuth increments), then
+  `downscale_climate()` immediately failed:
+  `FileNotFoundError: /app/bulgaria_rila_pirin/inputs/climate/ERA5.zarr does not exist`.
+- Root cause: `config.yml` had `climate.era5.zarr_store: ERA5.zarr`. Reading
+  `topoclass.py`'s `downscale_climate()` (~line 664-705) showed **two
+  branches**: `zarr_store is None` → uses the legacy/standard
+  `topo_scale.downscale_climate()` which reads plain NetCDF files directly;
+  `zarr_store is not None` → uses the newer `ClimateDownscaler` class, which
+  requires a **pre-built Zarr store** at `climate.path/<zarr_store>` — we
+  never built one, we only have the plain NetCDF ERA5 files from the CDS
+  download/merge step.
+- **Fix**: set `climate.era5.zarr_store: null` in `config.yml` to route
+  through the NetCDF-native path instead. (Note: there's a second,
+  unrelated `zarr_store: down.zarr` key under `outputs.file` — that one is
+  for output storage format, not touched.)
+
+### Bug #5: `downscale_climate()` (NetCDF path) globs for files in the wrong subfolder
+- 5th attempt: all four expensive steps loaded from cache correctly
+  (`ds_param.nc`, `df_centroids.pck`, `ds_solar.nc`, `da_horizon.nc` all
+  logged as "exists and loaded") — confirms bugs #1-4's fixes all hold.
+  `downscale_climate()` started but immediately raised
+  `OSError: no files to open`.
+- Root cause: `topo_scale.py`'s `downscale_climate()` does
+  `glob.glob(f'{climate_directory}/PLEV*.nc')` and same for `SURF*.nc`,
+  directly in `climate_directory` (which `topoclass.py` resolves to
+  `<project.directory>/inputs/climate/`, confirmed via `grep` — line ~96).
+  Our merged yearly ERA5 files are one level down, at
+  `inputs/climate/yearly/PLEV_2023.nc` / `SURF_2023.nc` (that's where the
+  ERA5 fetch/merge step from earlier in this session put them) — so the glob
+  in the climate root found nothing.
+- **Fix**: symlinked the yearly files up into the climate root (non-destructive,
+  originals untouched):
+  ```bash
+  cd /app/bulgaria_rila_pirin/inputs/climate
+  ln -sf yearly/PLEV_2023.nc PLEV_2023.nc
+  ln -sf yearly/SURF_2023.nc SURF_2023.nc
+  ```
+- 6th attempt launched with this fix; in progress — see status below.
+
+### Status as of this edit
+All five bugs found so far were dependency-version drift / path-convention
+mismatches between this installed TopoPyScale version and its dependencies
+(pandas frequency aliases) or between the ERA5 fetch step's output layout and
+`downscale_climate()`'s expected input layout — not fundamental issues with
+the DEM/mask/config design. All expensive terrain steps
+(`compute_dem_param`, `compute_horizon`) are cached and reused correctly on
+every relaunch, so each fix-and-retry cycle from here on is cheap (minutes,
+not hours). 6th attempt is running now with all five fixes in place; a
+background monitor is watching `pipeline_run5.log` for the next error or the
+final `Pipeline finished` line. Next step once finished: open the output in
+`outputs/downscaled/`, extract the `t` (air temperature) variable for
+2023-03-15, sanity-check it (plausible range/lapse-rate pattern across
+elevation), then decide 25m vs 10m DEM for the next, larger run.
+
+### Bug #6: fix for bug #3 broke a *different* hardcoded case-sensitive lookup
+- 6th attempt: all cached steps loaded correctly again, `downscale_climate()`
+  started processing all 500 points (`Preparing plev/surf for point NNN`
+  logged for every centroid), got all the way to ~point 461 of 500 doing the
+  actual per-point downscaling (`Downscaling t,q,p,tp,ws,wd for point: NNN`),
+  then crashed inside the multiprocessing pool:
+  `TypeError: unsupported operand type(s) for /: 'float' and 'NoneType'` at
+  `topo_scale.py:187` (`down_pt['tp'] = ... / meta.get('tstep') * ...`).
+- Root cause: **this session's own fix for bug #3** (lowercasing
+  `config.yml`'s `timestep: 1H` → `1h` to satisfy `pd.date_range`) broke a
+  *second*, unrelated piece of the same library that assumes the old
+  uppercase alias: `topo_scale.py:389` has
+  `tstep_dict = {'1H': 1, '3H': 3, '6H': 6}` (hardcoded, case-sensitive), and
+  `meta['tstep'] = tstep_dict.get(tstep)` — with `tstep = '1h'`, this lookup
+  silently returned `None` (dict `.get()` doesn't raise on a miss), which
+  then divided a float by `None` down the line. Two parts of the installed
+  TopoPyScale disagree on case convention for the exact same config value —
+  one needs lowercase for modern pandas (`pd.date_range(freq=...)` rejects
+  uppercase `'H'`), the other hardcodes uppercase.
+- **Fix**: patched the installed package directly (not a repo file — this
+  lives in the venv/container image, at
+  `/usr/local/lib/python3.13/site-packages/TopoPyScale/topo_scale.py:389`)
+  to accept both cases:
+  `tstep_dict = {'1H': 1, '3H': 3, '6H': 6, '1h': 1, '3h': 3, '6h': 6}`.
+  Verified the *other* use of this same integer value later in the same file
+  (`topo_scale.py:255`, `pd.Timedelta(f"{meta.get('tstep')}H").seconds`, used
+  in the longwave-radiation downscaling step) still works fine even with the
+  literal `"H"` suffix — `pd.Timedelta` (unlike `pd.date_range`'s `freq=`)
+  still accepts the uppercase alias, just with a deprecation warning, not a
+  hard error — so no further case-mismatch expected from this angle.
+- **Note for future sessions**: this patch is inside the Docker image's
+  installed package, not tracked by git. If the image is ever rebuilt from
+  the `Dockerfile` (not just restarted), this one-line patch will be lost
+  and bug #6 will resurface at the ~90%-through-500-points mark of
+  `downscale_climate()`. If that happens, reapply the same `sed` fix to
+  `topo_scale.py` line ~389, or (cleaner long-term) fork/patch the
+  TopoPyScale source properly and rebuild.
+- 7th attempt launched with this patch in place — in progress, see status.
+
+### Status as of this edit
+Six bugs found and fixed this session, all dependency-version drift /
+internal-inconsistency issues in the installed TopoPyScale + its
+dependencies (pandas, zarr, xarray) — not fundamental issues with the
+DEM/mask/config/data itself. All four expensive terrain/climate-prep steps
+(`compute_dem_param`, `compute_solar_geometry`, `compute_horizon`, and the
+per-point `plev`/`surf` extraction) are cached/idempotent and have been
+confirmed to reuse correctly across every relaunch, so each fix-and-retry
+cycle is now cheap. 7th attempt is running now with all six fixes in place;
+background monitor is watching `pipeline_run6.log`. Next step once finished:
+open the output in `outputs/downscaled/`, extract the `t` (air temperature)
+variable for 2023-03-15, sanity-check it (plausible range/lapse-rate pattern
+across elevation), then decide 25m vs 10m DEM for the next, larger run.
+
+### PIPELINE COMPLETED SUCCESSFULLY — 2026-08-07
+7th attempt ran clean end to end: `downscale_climate()` finished in 2233s
+(~37 min) processing all 500 cluster centroids × 24 hourly timesteps ×
+`t,q,p,tp,ws,wd` + `LW,SW` radiation, then `to_netcdf()` wrote the final
+merged result to **`bulgaria_rila_pirin/outputs/output.nc`** (361KB).
+`Pipeline finished` printed; no traceback.
+
+**Output structure**: `xarray.Dataset`, dims `(point_name: 500, time: 24)`,
+covering the full 2023-03-15 hourly cycle. Variables: `t, u, v, q, p,
+precip_lapse_rate, tp, ws, wd, theta_neg-derived wind dir, cse, LW,
+SW_diffuse, SW_direct, SW, cos_illumination` (17 total) — i.e. air
+temperature, wind, humidity, pressure, precipitation, and full
+shortwave/longwave radiation budget, not just `t`.
+Per-point files also retained in `outputs/downscaled/down_pt_*.nc` (500
+files, pre-merge).
+
+**Air temperature (`t`) sanity check — 2023-03-15**:
+- Kelvin range across all 500 points × 24h: 268.57–284.25 K (**-4.58°C to
+  +11.10°C**), mean 3.35°C.
+- **Elevation vs. daily-mean-temp correlation: -0.98** (near-perfect inverse
+  relationship, as physically expected).
+- **Fitted environmental lapse rate: -5.40°C/km** — within the physically
+  expected range (~-5 to -9°C/km) for a real atmospheric profile, not an
+  artifact.
+- Lowest-elevation points (~200-235m, e.g. point 034 at 203.8m): ~8.6-8.8°C
+  daily mean.
+- Highest-elevation points (~2320-2370m, e.g. point 250 at 2368.5m, near
+  Musala/Rila peaks): ~-2.4 to -2.6°C daily mean.
+- **Conclusion: the downscaled result is physically sound**, not just
+  in-range by coincidence — cold-high/warm-low gradient matches the DEM
+  exactly as it should.
+
+**End-to-end pipeline validated for this test case.** All 6 bugs found this
+session (see above) are now documented with fixes; 3 are in `config.yml`
+(tracked in git), 1 is a mask-file regeneration (`fix_mask.py`, tracked),
+1 was a misplaced cache file (moved, not a code change), and 1 (`tstep_dict`
+patch) lives in the container image only — **remember to reapply that patch
+if the Docker image is ever rebuilt** (see Bug #6 section above for the
+exact `sed` command).
+
+### Next decision point: 25m vs 10m DEM for the full run
+This 25m/single-day/500-cluster test is now a working, validated reference
+run. Before committing to the full multi-year run, decide:
+- Whether the 25m DEM's terrain resolution is adequate for the thesis's
+  spatial-detail needs, or whether the newer 10m DEM is worth the (likely
+  much larger) `compute_dem_param()`/`compute_horizon()` runtime cost —
+  those two steps scale with pixel count, and 10m vs 25m is ~6.25× more
+  pixels for the same area.
+- Not yet decided — pending discussion with the user.
+
+### Bugs #7/#8: pandas 3.0 breaks the per-pixel cluster-grid write-back (does NOT affect the actual downscaled results)
+- Goal: "paint back" the 500-cluster downscaled `t` values onto the full
+  25m/13.9M-pixel grid, for visualization/GIS use. TopoPyScale stores a
+  per-pixel `point_name`/`cluster_labels` grid inside `ds_param.nc`
+  specifically for this purpose (built by `extract_topo_cluster_param()`).
+  On inspection, that grid was **entirely `-9999`** (i.e. "no cluster") for
+  every single pixel, and the `mask` variable stored in the same file was
+  also wrong (all `1`, not the correct 13,945,288/24,364,563 AOI split).
+- **Important distinction**: this does **not** affect the validated
+  downscaled temperature results from the "PIPELINE COMPLETED SUCCESSFULLY"
+  section above. `output.nc` and `df_centroids.pck` are built from a
+  different code path (`.groupby()`-based aggregation, not the buggy
+  write-back) and remain correct — confirmed again below.
+- **Bug #7 root cause**: `topoclass.py`'s `extract_topo_cluster_param()`
+  (~line 445, was) did a **chained assignment**:
+  `df_param['point_name'].loc[~df_param.cluster_labels.isnull()] = ...`.
+  Under pandas ≥3.0 (mandatory Copy-on-Write — this environment has pandas
+  **3.0.5**), `df[col].loc[mask] = value` silently writes to a throwaway
+  copy and never updates the real dataframe (raises
+  `ChainedAssignmentError` as a *warning*, not a hard failure, so the
+  pipeline just silently kept going with `point_name` stuck at its `'-9999'`
+  default for every row). **Fixed** in the installed package (same
+  container-image-only caveat as bug #6) by rewriting as a single
+  non-chained `.loc[row_indexer, col_indexer]` assignment:
+  ```python
+  # before (broken under pandas 3.0 CoW):
+  df_param['point_name'] = '-9999'
+  df_param['point_name'].loc[~df_param.cluster_labels.isnull()] = df_param.cluster_labels.loc[~df_param.cluster_labels.isnull()].astype(int).astype(str).str.zfill(n_digits)
+  # after:
+  df_param['point_name'] = '-9999'
+  not_null = ~df_param.cluster_labels.isnull()
+  df_param.loc[not_null, 'point_name'] = df_param.loc[not_null, 'cluster_labels'].astype(int).astype(str).str.zfill(n_digits)
+  ```
+- **Bug #8, hit while re-running to verify the bug #7 fix**: re-invoking
+  `extract_topo_cluster_param()` directly (the wrapper `extract_topo_param()`
+  skips it entirely once `df_centroids.pck` exists — cost ~326s for
+  Mini-Batch K-means on the masked population, not hours) hit a *second*,
+  unrelated pandas 3.0 issue at
+  `df_param.loc[subset_mask, 'cluster_labels'] = cluster_labels + i_clusters`:
+  `TypeError: Invalid value for dtype 'str'` — pandas 3.0's new
+  Arrow-backed default string dtype rejects assigning integers into a column
+  it inferred as string. This confirms the installed TopoPyScale (0.3.3)
+  has **multiple**, not just one, incompatibilities with pandas 3.0 in this
+  code path.
+- **Decision: did not keep patching `extract_topo_cluster_param()` bug by
+  bug.** Instead, wrote a standalone script,
+  `bulgaria_rila_pirin/paint_back.py`, that reproduces the pixel→cluster
+  assignment **independently**, without touching TopoPyScale's buggy
+  write-back code at all:
+  1. Fit `sklearn.preprocessing.StandardScaler` on the full AOI-masked pixel
+     population's clustering features (`x, y, elevation, slope, aspect_cos,
+     aspect_sin, svf` — same features/weights as `config.yml`'s
+     `clustering_features`), using the **known-good** grids in `ds_param.nc`
+     (only the `mask`/`cluster_labels`/`point_name` variables were
+     corrupted — `elevation`/`slope`/`aspect_*`/`svf` were computed by
+     `compute_dem_param()` and are untouched by this bug) + `mask.tif`.
+  2. Transform the 500 existing centroids (`df_centroids.pck.bak`, backed up
+     before any of this session's re-clustering attempts — the file that
+     produced the validated `output.nc` results) into the same scaled space.
+  3. `scipy.spatial.cKDTree` nearest-centroid lookup for every one of the
+     13,945,288 AOI pixels — this **is** what k-means cluster assignment
+     means (nearest centroid in scaled feature space), so it reproduces the
+     same logical assignment without re-running/depending on the buggy
+     library call.
+  4. Look up each pixel's assigned point's downscaled `t` value (all 24
+     hourly timesteps) from `output.nc` and write a 24-band GeoTIFF.
+- **Verification performed** (both passed cleanly):
+  - Value-range check: painted raster's valid-pixel min/max (268.572–284.249 K)
+    matches `output.nc`'s own min/max (268.57236–284.24861 K) to
+    float32 precision — confirms no value corruption/mislookup.
+  - Pixel-count check: exactly 13,945,288 valid pixels painted — matches the
+    mask's AOI pixel count exactly, no leakage/gaps.
+  - **Per-pixel spatial correlation, elevation vs. mean-temperature raster:
+    -0.93** across all 13.9M pixels (stronger/more granular confirmation
+    than the earlier 500-point-level check, which was -0.98) — physically
+    coherent, not a coincidence.
+- **Output**: `bulgaria_rila_pirin/outputs/t_2023-03-15_hourly_25m.tif` —
+  24-band GeoTIFF (one band per hour of 2023-03-15), EPSG:32634, 25m,
+  aligned exactly to the DEM, nodata=-9999 outside the AOI mask, LZW
+  compressed. Band descriptions carry the ISO timestamp for each hour.
+- **Note for future sessions**: `df_centroids.pck.bak` (backup taken before
+  the bug #7/#8 investigation) is the file this raster and `output.nc` are
+  both consistent with — don't delete it. `ds_param.nc`'s own
+  `mask`/`cluster_labels`/`point_name` variables remain broken/unfixed (not
+  worth patching further given bug #8 showed more issues lurk in that code
+  path) — **use `paint_back.py`'s approach, not `ds_param.nc`'s own grid
+  variables**, for any future "paint back to raster" need for other
+  variables (`q`, `SW`, `LW`, etc. — just change the `variable` constant at
+  the top of the script).
+
+## Session update — 2026-08-07 (continued): meteo station validation prep begins
+
+**Goal**: validate the downscaled output against real station observations
+(METER.AC network). User added `ex1_norway_finse/` to the repo as a
+reference example of TopoPyScale's own point-based validation workflow —
+used it to understand the target methodology before starting.
+
+### Confirmed: current pipeline uses classic multicore, NOT dask+zarr
+Checked `config.yml` (`parallelization.downscaling_method: multicore`,
+`climate.era5.zarr_store: null`) against `ex2_romania_retezat/config.yml`
+(`downscaling_method: dask`, `zarr_store: ERA5.zarr`) — confirmed we
+deliberately fixed onto the classic NetCDF+multiprocessing path (bug #4,
+earlier in this file) rather than the newer dask/Zarr `ClimateDownscaler`
+path Retezat uses. Working correctly as-is; dask/Zarr may be worth revisiting
+for the eventual full multi-year run (lazier/chunked handling scales better),
+but not needed for this single-day validation.
+
+### Norway example (`ex1_norway_finse/`) — validation methodology learned
+- `inputs/dem/station_list.csv`: `Name, stn_number, latitude, longitude, x, y`
+  — `x`/`y` must be in the **DEM's projected CRS** (confirmed by reading
+  `topoclass.py`'s `extract_pts_param()`: the CSV is read from
+  `<project.directory>/inputs/dem/<csv_file>`, each row snapped to nearest
+  DEM pixel via `tp.extract_pts_param(..., method='nearest')`).
+- `config_point.yml`: separate config from the main clustering one, with
+  `sampling.method: points` + `sampling.points.csv_file: station_list.csv`
+  (optionally `sampling.points.name_column` to pick which CSV column becomes
+  `point_name` — defaults to zero-padded row index if omitted). Downscales
+  climate **directly at** each station's coordinates instead of at cluster
+  centroids.
+- `pipeline_point.py`: same 6-step pipeline, just pointed at
+  `config_point.yml`.
+- `compare_downscaling_to_observation.ipynb`: loads obs (MET Norway API
+  pickles, long-format `sourceId/referenceTime/elementId/value`, pivoted to
+  a wide `xarray.Dataset`), loads downscaled points
+  (`xr.open_mfdataset('down_pt*.nc', concat_dim='point_id', ...)`), aligns
+  time ranges, **resamples observations to the downscaled hourly timestep**
+  (`.resample('1H').mean()` — mean-only since MET Norway data didn't need
+  min/max) per station/variable, then plots scatter+regression (1:1 line)
+  and time series + bias. TopoPyScale's own `topo_obs.py` module only has
+  MET-Norway-Frost-API and WMO loaders — nothing METER.AC-specific, so the
+  fetch/parse side is ours to build, but this comparison methodology is
+  fully reusable.
+
+### METER.AC fetch — run for real this session (previously only scripted, never executed)
+Ran `meteo-data.py --mask inputs/mask/rila_pirin_PERFECT_RECTANGLE_32634.geojson --outdir data/meterac`
+inside the container (network egress confirmed working; ran in background,
+took a few minutes due to the deliberate 1.5s/node rate-limit delay).
+- **Network total: 229 nodes** (was 228 when last checked pre-session — one
+  new node registered since). **29 fall inside the AOI — reconfirmed, count
+  unchanged.**
+- All 29 nodes' raw 5-min history downloaded to
+  `bulgaria_rila_pirin/data/meterac/<NodeID>_history_raw.txt` (~470MB total,
+  1–35MB per station reflecting multi-year 5-min histories), plus
+  `selected_stations_metadata.csv` (NodeID, Location, Altitude, Latitude,
+  Longitude, sensor model info).
+- **Ran the full coverage summary** (`meteo_data_convert.py --no-csv` across
+  all 29 raw files) — this replaces the old "4 of 29 checked" state with
+  complete coverage data for every node:
+
+  ```
+  node                     start                       end  n_records  avg_interval_min
+   N48 2018-11-24 13:32:04+00:00 2023-08-16 19:07:48+00:00     486731               5.1
+  N303 2019-01-26 15:51:53+00:00 2026-08-07 12:44:50+00:00     689242               5.7
+   N32 2019-02-17 12:19:20+00:00 2026-08-07 12:41:04+00:00     698088               5.6
+  N306 2019-08-23 08:45:26+00:00 2024-04-03 23:25:24+00:00     320587               7.6
+  N221 2020-03-14 09:46:32+00:00 2026-08-07 12:41:21+00:00     644226               5.2
+  N110 2020-05-09 15:26:05+00:00 2026-08-07 12:31:56+00:00     461408               7.1
+  N155 2020-08-05 14:07:25+00:00 2026-08-07 12:43:10+00:00     528360               6.0
+  N081 2020-08-06 14:00:55+00:00 2026-08-07 12:43:50+00:00     541683               5.8
+  N164 2020-08-08 13:04:33+00:00 2026-08-03 18:29:26+00:00     324024               9.7
+  N108 2020-12-06 16:09:45+00:00 2026-08-07 12:40:15+00:00     580898               5.1
+  N058 2020-12-26 14:25:14+00:00 2026-08-07 12:43:04+00:00     250352              11.8
+  N097 2021-02-12 10:47:19+00:00 2026-08-07 12:41:49+00:00     117727              24.5
+  N122 2021-02-26 14:00:34+00:00 2026-08-07 12:42:50+00:00     255847              11.2
+  N067 2021-02-26 15:36:03+00:00 2026-08-07 12:42:53+00:00     475502               6.0
+  N142 2021-04-17 17:38:50+00:00 2026-08-07 12:42:00+00:00     537778               5.2
+  N235 2021-04-18 15:26:52+00:00 2026-08-07 12:43:34+00:00     463131               6.0
+  N096 2021-06-20 12:48:05+00:00 2025-04-06 19:28:26+00:00      19313             103.4
+  N098 2021-12-05 06:50:38+00:00 2026-03-23 03:34:49+00:00     342488               6.6
+  N072 2022-03-24 10:03:07+00:00 2026-08-07 12:37:52+00:00     381232               6.0
+  N094 2022-07-17 12:42:33+00:00 2023-07-01 06:47:19+00:00      47555              10.6
+   N27 2022-10-25 10:33:11+00:00 2026-08-07 12:40:45+00:00     332277               6.0
+  N349 2023-01-28 14:16:10+00:00 2026-08-07 03:34:08+00:00     142451              13.0
+  N313 2023-07-11 05:54:36+00:00 2026-08-07 12:45:48+00:00     310133               5.2
+  N175 2023-08-10 04:30:20+00:00 2025-11-02 09:54:26+00:00      22535              52.1
+  N323 2024-12-21 11:30:57+00:00 2026-08-07 12:41:48+00:00     163286               5.2
+  N141 2025-08-05 07:11:08+00:00 2026-08-07 12:44:16+00:00      94424               5.6
+  N321 2026-01-25 10:15:02+00:00 2026-08-07 12:45:52+00:00      50277               5.6
+  N330 2026-05-10 13:44:55+00:00 2026-08-07 12:45:52+00:00      25181               5.1
+  ```
+
+- **N211 (Makedonia_Hut, 2165m) has zero data ever** — raw file is just the
+  header row, no records. Registered node, never actually reported.
+  Exclude from validation.
+- **22 of 29 stations cover 2023-03-15** (start ≤ date ≤ end): N48, N303,
+  N32, N306 (Musala), N221, N110, N155, N081, N164, N108, N058, N097, N122,
+  N067, N142, N235 (Boboshevo), N096, N098, N072, N094, N27 (Semkovo), N349.
+- **6 stations don't cover it** — all started after 2023-03-15 (never
+  existed yet at test-date time): N313 (Jul 2023), N175 (Aug 2023), N323
+  (Dec 2024), N141 (Aug 2025), N321 (Jan 2026), N330 (May 2026).
+- **Flag for the hourly-aggregation step**: N096 (Lovna_Hut) has an average
+  reporting interval of 103 minutes (vs. ~5-6 min for most others) despite
+  nominally covering the date range — its 5-min reporting is very
+  intermittent, so "covers the date range" does **not** guarantee it
+  actually has data specifically on 2023-03-15. Must verify per-station,
+  per-day data presence directly (not just start/end coverage) before
+  finalizing the validation station list — this is the next step, along
+  with building the actual 5-min→hourly min/max/mean aggregation.
+
+### CORRECTION: per-day check on 2023-03-15 overturns 5 of the 22 "covering" stations
+Checking overall start/end range is not the same as having actual data on
+the specific test date — verified this directly (row counts specifically
+within 2023-03-15 00:00–24:00 UTC, plus a wider Feb15–Apr15 2023 window to
+see gap shape) and found real, substantial outages:
+- **N306 (Musala, 2925m) — ZERO rows for the entire Feb15–Apr15 2023
+  window.** This directly contradicts this file's own earlier note
+  ("Musala (N306): 2019-08-23 → 2024-04-03" was based only on first/last
+  record overall, not continuous coverage). Likely a winter
+  power/connectivity outage at the summit — losing this station is a real
+  loss for validating the cold/high-elevation end of the lapse rate, but
+  the data simply isn't there.
+- **N058 — ZERO rows for the entire Feb15–Apr15 2023 window.**
+- **N096 — ZERO rows for the entire Feb15–Apr15 2023 window** (consistent
+  with its already-flagged sparse ~103min average interval).
+- **N27 (Semkovo) — has data, but stops 2023-03-12**, 3 days before the
+  test date, doesn't resume within the checked window. Also contradicts
+  this file's earlier "Semkovo (N27): 2022-10-25 → still live" note (again,
+  that was overall range only).
+- **N094 — has data, but only through 2023-02-21**, over 3 weeks before
+  the test date.
+- **The other 17 of the 22 candidates were confirmed to have real,
+  complete hourly-ish coverage (259-288 5-min records) specifically on
+  2023-03-15**: N48, N303, N32, N221, N110, N155, N081, N164, N108, N097,
+  N122, N067, N142, N235 (Boboshevo), N098, N072, N349.
+
+**Final validation station set for 2023-03-15: these 17 stations.**
+
+### Hourly aggregation + station_list.csv — done
+Wrote `bulgaria_rila_pirin/meteo_hourly_agg.py`: for each of the 17
+confirmed stations, resamples the 2023-03-15 5-min `T [deg C]` readings to
+hourly `min`/`max`/`mean`/`n_obs` (`<NodeID>_hourly_2023-03-15.csv`, plus a
+combined `all_stations_hourly_2023-03-15.csv`, both in
+`data/meterac/`, gitignored same as the raw data). Also builds
+`bulgaria_rila_pirin/inputs/dem/station_list.csv` (tracked — small,
+lat/lon/x/y/elevation only, no bulk data) in the Norway-example format
+(`Name, stn_number, latitude, longitude, x, y` + an extra `elevation_m`
+column), reprojecting lat/lon → EPSG:32634 via geopandas to match the DEM's
+CRS, as required by `topoclass.py`'s `extract_pts_param()`.
+- 15 of 17 stations: full 24/24 hourly coverage on 2023-03-15.
+- N098 (Malyovitsa_Hut): 21/24 hours (gaps within the day, not a full
+  outage — fine to use, just drop the missing hours during comparison).
+- N349 (Bodrost): 14/24 hours (same — partial-day gaps, still usable).
+- Verified all 17 stations' `x`/`y` fall correctly within the DEM's
+  bounds (649842–769767 / 4575636–4702611 in EPSG:32634).
+
+### Remaining steps for meteo validation (updated checklist)
+- [x] Fetch all 29 in-AOI METER.AC nodes' metadata + raw history.
+- [x] Full coverage-window check for all 29 (was 4/29) — see table above.
+- [x] Verify actual per-day data presence on 2023-03-15 — corrected the
+  candidate list from 22 down to 17 real usable stations (see above).
+- [x] Aggregate 5-min → hourly `min`/`max`/`mean` temperature per station.
+- [x] Build `station_list.csv` (METER.AC node IDs, lat/lon, DEM-projected
+  x/y in EPSG:32634) in the format TopoPyScale's `sampling.points` expects.
+- [ ] Create `config_point.yml` variant + run point-sampling pipeline to get
+  downscaled values *at* station locations.
+- [ ] Port Norway notebook's comparison methodology (resample-aligned
+  scatter/regression + time series/bias plots) to METER.AC variables.
+
+### QGIS comparison deliverables (input ERA5 vs. downscaled output)
+Added for visual/quantitative comparison in QGIS, all in
+`bulgaria_rila_pirin/outputs/`:
+- `era5_t2m_2023-03-15_hourly.tif` — raw ERA5 2m air temperature (`t2m` from
+  `inputs/climate/yearly/SURF_2023.nc`), 24-band (hourly), native ERA5 grid
+  (8×10 cells, ~0.25°, EPSG:4326). Exported via `gdal_translate` from the
+  `NETCDF:...:t2m` GDAL subdataset.
+- **Sanity-checked the raw grid by hand** (band 1, 2023-03-15 00:00 UTC)
+  after it looked like a "checkerboard" in QGIS's default symbology — the
+  actual numbers are a smooth, physically coherent field (cold pocket down
+  to -1.2°C right over the Rila-Pirin massif, surrounded by warmer
+  lowland/coastal values up to +8.1°C toward the south). **Not a bug** — the
+  checkerboard appearance was a symbology artifact (diverging ramp
+  auto-stretched to a tight ~9°C range across only 8×10 giant cells makes
+  small real steps look like strong color flips). No fix needed, just use a
+  wider/continuous classification when eyeballing it.
+- `era5_t2m_2023-03-15_resampled_25m.tif` — the above, `gdalwarp`'d (bilinear)
+  onto the **exact same grid** as the downscaled output (same
+  extent/resolution/CRS, EPSG:32634, 25m) — needed so ERA5 and the
+  downscaled raster are pixel-for-pixel comparable, not just visually
+  overlaid with on-the-fly reprojection.
+- `era5_t2m_2023-03-15_resampled_25m_nearest.tif` — same as above but
+  `gdalwarp -r near` instead of bilinear, so the original ~0.25° ERA5 cell
+  boundaries stay visually sharp/blocky on the 25m grid (34 distinct values
+  across the raster, confirmed) rather than being smoothed — useful for
+  visually confirming "these are the real coarse ERA5 cells" rather than a
+  continuous interpolation.
+- Clarified a QGIS layer-ordering confusion (not a bug): the downscaled
+  layer, checked and listed above ERA5 in the Layers panel, is fully opaque
+  within the AOI and was visually hiding the ERA5 layer entirely — the fine
+  ridge/valley detail the user was seeing was the downscaled layer, not
+  ERA5. Verified independently that the resampled ERA5 raster's correlation
+  with elevation is a moderate -0.50 (a real but broad regional trend),
+  nowhere near the downscaled layer's -0.93 fine terrain-tracking —
+  confirms ERA5 data itself is correctly coarse, no bug.
+- `diff_downscaled_minus_era5_2023-03-15_hourly.tif` — `downscaled − era5`,
+  computed band-by-band (`bulgaria_rila_pirin/diff_raster.py`), nodata
+  -9999 outside the AOI mask (matching the downscaled raster). Range:
+  **-12.1°C to +8.5°C, mean ~+0.14°C**. Physically sensible: negative
+  (downscaled colder) concentrates on ridgelines/peaks where ERA5's coarse
+  grid underestimates true elevation-driven cooling; positive (downscaled
+  warmer) concentrates in valley floors where ERA5's blurred average
+  overestimates elevation. This is the direct visual/quantitative
+  demonstration of what the terrain-aware downscaling corrects versus the
+  raw reanalysis input.
+
+### Permissions note
+Per explicit user instruction this session: proceeding autonomously without
+pausing for per-command confirmation until the downscaled result is
+obtained; permission scoping will be reconsidered together once results are
+in. **Results are now in — revisit permission scoping with the user.**
+
+## Session wrap-up — 2026-08-07: point-sampling setup, alternate data sources researched, git hygiene
+
+### Point-sampling pipeline for station validation — prepared but NOT yet run
+- Created `bulgaria_rila_pirin/outputs_points/` (separate from the main
+  `outputs/`, so the toposub run's cached files are never touched) and
+  seeded it with a copy of the validated `ds_param.nc` (confirmed via
+  reading `topo_param.py`'s `extract_pts_param()` that point-sampling only
+  reads `elevation/slope/aspect/aspect_cos/aspect_sin/svf` — **not** the
+  corrupted `cluster_labels`/`mask`/`point_name` grid variables from bugs
+  #7/#8, so reusing this file is safe).
+- Wrote `bulgaria_rila_pirin/config_point.yml`: same project/climate/DEM
+  settings as the main `config.yml`, but `sampling.method: points`,
+  `sampling.points.csv_file: station_list.csv`,
+  `sampling.points.name_column: stn_number` (so downscaled point IDs come
+  out as the real METER.AC node IDs, e.g. "N48", not an arbitrary index),
+  and `outputs.directory: outputs_points`.
+- **Not yet executed** — paused before running to first do the full-history
+  processing below. **Next session: run this** (`compute_dem_param` will
+  cache-hit immediately via the copied `ds_param.nc`; `extract_topo_param`
+  routes to `extract_pts_param` for the 17-or-so station points;
+  `compute_solar_geometry`/`compute_horizon`/`downscale_climate` all need to
+  actually run since these are new point locations, but should be much
+  faster than the 500-cluster run given far fewer points — expect minutes,
+  not the ~40min the toposub run took for `downscale_climate` alone).
+
+### Full-history processing across all 28 METER.AC stations (superseding the single-day-only aggregation)
+User asked to go further than just 2023-03-15: process every station's
+**entire** history, not just the test day, and explicitly flag data gaps.
+- `bulgaria_rila_pirin/meteo_full_history.py`: for all 28 stations with any
+  data (excludes N211), resamples 5-min `T [deg C]` to hourly
+  min/max/mean/n_obs across each station's full lifetime, classifying every
+  hour as **complete** (≥10/12 nominal 5-min readings — confirmed via the
+  metadata CSV that ALL METER.AC nodes share the same nominal 5-min
+  `ReportingFrequency`, so 12/hour is a universal, not per-station, baseline),
+  **partial** (1-9), or **gap** (0). Wrote per-station
+  `<NodeID>_hourly_full_history.csv` + combined
+  `all_stations_hourly_full_history.csv` (**1,075,312 rows** total) +
+  `station_coverage_summary.csv` (lifetime % complete/partial/gap per
+  station) — all in `data/meterac/` (gitignored).
+- **Station reliability varies enormously** — this is the headline finding:
+  N330 (98.4% complete), N048/N108 (97.4%), N142 (95.9%), N221 (95.5%) are
+  excellent; N096 (94.8% *gap*, only 4.7% complete), N097 (78.6% gap), N175
+  (88.7% gap), N058 (53.8% gap) are barely functional over their lifetimes.
+- `bulgaria_rila_pirin/meteo_overlap_analysis.py`: built a day×station
+  coverage matrix (`station_daily_status.csv`) and network-wide daily
+  rollup (`network_daily_summary.csv`) classifying each station-day as
+  `full` (24/24 complete hours), `usable` (no gap hours, some partial),
+  `gappy` (≥1 gap hour), or `no_data` (edge of station's own range).
+  **Key finding: across the entire 2018-11-24 to 2026-08-07 history (2,814
+  days), no single day ever has more than 16 of the 28 stations
+  simultaneously "full"** — and only 2 days ever hit that (2025-09-08,
+  2026-07-31); median is 9/28. Best sustained windows: ≥10 stations full
+  for 34 consecutive days (2026-02-23 to 2026-03-28); ≥12 for 17 days
+  (2025-09-22 to 2025-10-08). **Our chosen test date, 2023-03-15, scores
+  11/28 full, 15/28 usable-or-better** — a moderate day, well below what's
+  achievable in 2025-2026 windows.
+- **Open decision, not yet made**: whether to stick with 2023-03-15 (all
+  pipeline debugging already solved for this date) or switch to a
+  better-covered window (e.g. Feb-Mar 2026) for stronger station
+  validation. Switching costs a new ERA5 download + pipeline rerun, but
+  reruns are now fast/proven since every bug this session was fixed.
+
+### Alternate data source research: stringmeteo.com and NIMH (Bulgaria's official met service) — assessed, not pursued for scraping
+- Checked `stringmeteo.com` (a ~196-station Bulgarian amateur+official
+  network aggregator, found via `other-scripts/stations_list.csv`,
+  `scrape_stations.py`, `check_one_station.py` — pre-existing scripts from
+  before this session). **Decided against scraping it**: its `robots.txt`
+  explicitly disallows `/stations/archive/`, `/stations/archive_key/`,
+  `/stations/graphs/` (exactly the historical-data pages needed), and its
+  own terms state data is "intended for personal use only" and
+  "unsuitable for... scientific research." The pre-existing scripts in
+  `other-scripts/` were already scoped compliantly (only the allowed
+  `/stations/index.php` listing page and a single station's *current*
+  page) — confirms this boundary was already correctly respected before
+  this session, nothing to walk back.
+  - Manually identified (for the user to browse by hand, which is fine —
+    the robots.txt/ToS concern is about automated scraping, not human
+    browsing) which stations in/near the AOI are active vs. dead: active —
+    Bansko, Boboshevo, Rila Monastery (`rilamon`, standard category, elevation
+    ~1147m, **not** covered by any METER.AC node), Samokov-2, Kostenets,
+    Pastra, Blagoevgrad-center. **Every genuinely high-alpine hut/peak
+    station overlapping the AOI is marked permanently dead**: Bezbog Hut,
+    Gotse Delchev Hut, Kartala-1/2, Borovets-Alpin/Ela. Two dead entries
+    (`ortsevo`, `semkovo`) share names with still-active METER.AC nodes
+    (N164, N27) — likely the same physical sites migrated networks, not a
+    genuinely independent second source.
+- Checked NIMH (Bulgaria's National Institute of Meteorology and
+  Hydrology, official government service) as a "request data directly"
+  option per user's suggestion:
+  - Official experimental open-data portal (`info.meteo.bg/openData`):
+    currently publishes only **daily** precipitation/river-discharge/snow
+    and **monthly** mean/min/max temperature — no hourly temperature yet,
+    too coarse for direct validation (useful at most as a rough monthly
+    sanity check).
+  - **Musala** (2925m, our DEM's highest point) has been an official NIMH
+    station since **1932** — third-party resellers (meteoblue) sell hourly
+    historical data "since 1940" for it commercially, strongly implying
+    NIMH holds hourly archives internally even though not yet published.
+    This would directly fill the gap left by METER.AC's own Musala node
+    (N306) being offline on 2023-03-15.
+  - **Bansko** (917m) is also an official NIMH climatic station, almost
+    exactly co-located with METER.AC's active N48 Bansko (931.4m) — a
+    genuine official-vs-citizen-station cross-check opportunity.
+  - No documented online data-request form or dedicated researcher contact
+    found — only a general MOEW administrative email
+    (`edno_gishe@moew.government.bg`). Government press material states
+    NIMH provides "free access to primary hydrometeorological data," which
+    is a good sign for a direct request, but there's no self-service path
+    — **direct outreach (email) is confirmed as the actual/only path**,
+    consistent with the user's own instinct.
+  - **Recommendation given to user**: if emailing NIMH, ask specifically
+    for hourly air temperature at **Musala and Bansko** for whichever
+    date(s) get finalized — not Rila/Kresna (lower elevation, redundant
+    with existing METER.AC coverage nearby).
+
+### Git hygiene check before today's push
+Before pushing, audited every new/modified file today for size and
+`.gitignore` coverage (this repo already had one past incident of a large
+geodata push failure, per the 2026-08-06 entry above — wanted to avoid a
+repeat).
+- All of today's `outputs/`, `outputs_points/`, and `data/meterac/` files
+  (multi-GB `.nc`/`.tif`/raw station `.txt` dumps) confirmed already
+  correctly caught by existing blanket rules (`*.nc`, `*.tif`,
+  `bulgaria_rila_pirin/data/`, `bulgaria_rila_pirin/outputs/`) — verified
+  explicitly with `git check-ignore -v` on every known heavy file.
+- **Found two real gaps**, both fixed:
+  1. `bulgaria_rila_pirin/inputs/dem/mask.tif.bak` (18MB, a temporary backup
+     from the mask-bounds fix earlier this session, no longer needed now
+     that the fix is thoroughly verified) — **deleted**.
+  2. `ex1_norway_finse/inputs/obs/*.pckl` (4 files, **331MB total**, MET
+     Norway observation pickles) — **not** covered by any existing rule
+     (unlike that same folder's `.nc`/`.tif` climate/DEM files, which
+     already were). Added `*.pkl` and `*.pckl` to `.gitignore`, plus
+     `bulgaria_rila_pirin/outputs_points/` explicitly (redundant with the
+     `*.nc` rule for now, but matches the existing `outputs/` pattern for
+     future-proofing).
+- Re-verified after the fix: nothing untracked/modified today exceeds
+  ~1.8MB (the Norway example notebook, which has embedded plot images).
+  Safe to push.
+
+### Remaining checklist (updated)
+- [ ] Run the point-sampling pipeline (`config_point.yml`, prepared above).
+- [ ] Port Norway notebook's comparison methodology (resample-aligned
+  scatter/regression + time series/bias plots) to METER.AC variables, using
+  the point-sampling output once run.
+- [ ] Decide: keep 2023-03-15 or switch to a better-covered validation
+  window (see overlap analysis above) — open discussion with user.
+- [ ] (Optional, pending user follow-up) Email NIMH for Musala + Bansko
+  hourly temperature at the finalized validation date(s).
