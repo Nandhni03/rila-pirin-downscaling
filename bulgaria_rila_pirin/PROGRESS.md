@@ -147,6 +147,22 @@ find bulgaria_rila_pirin/outputs -maxdepth 2 -type f 2>/dev/null | sort
 ```
 
 - If the outputs folder stays empty for a while, that means the heavy terrain/horizon/downscaling part is still running; once files appear, we can inspect them and decide whether to keep the 25 m DEM baseline or switch to the 10 m DEM for the next round.
+- Follow-up from the latest run: the workflow had already produced a large set of artifacts before the shell was terminated, including `outputs/output.nc`, `outputs/era5_t2m_2023-03-15_resampled_25m.tif`, `outputs/t_2023-03-15_hourly_25m.tif`, and many `outputs/downscaled/down_pt_*.nc` files. This confirms the downscaling stage reached a successful output-writing state.
+- The next useful inspection command is:
+
+```bash
+cd /home/icam_labs/nandhni/downscaling-topopyscale-project/rila-pirin-downscaling
+python - <<'PY'
+import os
+from netCDF4 import Dataset
+for path in ['bulgaria_rila_pirin/outputs/output.nc', 'bulgaria_rila_pirin/outputs/downscaled/down_pt_000.nc']:
+    if os.path.exists(path):
+        ds = Dataset(path)
+        print(path)
+        print(list(ds.variables.keys()))
+        print(ds.dimensions)
+PY
+```
 
 ## Session update — 2026-08-06 (continued, Claude Code session)
 
@@ -854,3 +870,185 @@ repeat).
   window (see overlap analysis above) — open discussion with user.
 - [ ] (Optional, pending user follow-up) Email NIMH for Musala + Bansko
   hourly temperature at the finalized validation date(s).
+
+## Session update — 2026-08-13: full-history pipeline upgrade, repo reorganization, coverage/temperature plots
+
+### `meteo_full_history.py` upgraded: station names, N211 included, new daily-aggregation output
+- Added `station_name` (joined from `selected_stations_metadata.csv`) to every
+  per-station and combined output file — previously only the bare NodeID.
+- **N211 (Makedonia_Hut) is now explicitly processed**, not silently skipped:
+  it has zero raw records ever, so it gets a `no_data` row in
+  `station_coverage_summary.csv` (all 29 in-AOI nodes now accounted for,
+  instead of only the 28 with any data).
+- **New**: daily aggregation, not just hourly. For each station, the hourly
+  series is resampled to one row per day (`temp_c_min/max/mean`,
+  `n_hours_with_data`, `coverage` = complete/partial/gap based on
+  ≥20/24 hours present). Per-station `<NodeID>_daily_full_history.csv` plus a
+  combined `stations_daily_full_history.csv` (44,831 rows).
+- `overall_status` per station (`good`/`partial`/`mostly_gap`/`no_data`) added
+  to `station_coverage_summary.csv`, thresholded on lifetime %complete
+  (≥80% good, ≥30% partial, else mostly_gap).
+- **Permissions snag**: `data/` and `data/meterac/` were root-owned (written
+  by earlier container runs), blocking the host user from writing new output
+  files. Fixed by starting the container (`docker compose up -d`; confirmed
+  via the Dockerfile's missing `USER` directive that it runs as root, matching
+  the existing file ownership) and running the script via
+  `docker compose exec -T toposcale python3 ...` instead of the host venv.
+  User separately ran `sudo chown -R $USER:$USER bulgaria_rila_pirin` to fix
+  ownership going forward, so future runs don't need the container just for
+  file permissions.
+
+### Repo reorganization
+- Moved the 4 combined/summary files out of `data/meterac/` up into `data/`
+  directly (`stations_hourly_full_history.csv`,
+  `stations_daily_full_history.csv`, `station_coverage_summary.csv`,
+  `selected_stations_metadata.csv`) — per-station files stay in
+  `data/meterac/`. `meteo_full_history.py` updated accordingly
+  (`COMBINED_DIR` vs `OUT_DIR`).
+- **All `.py` scripts moved from `bulgaria_rila_pirin/` into
+  `bulgaria_rila_pirin/scripts/`** (via `git mv`, history preserved):
+  `diff_raster.py`, `fix_mask.py`, `meteo-data.py`, `meteo_data_convert.py`,
+  `meteo_full_history.py`, `meteo_hourly_agg.py`,
+  `meteo_overlap_analysis.py`, `paint_back.py`, `pipeline.py`. Only one path
+  fix was needed (`meteo_full_history.py`'s host-execution fallback, now
+  `.parent.parent`) — every other script uses absolute `/app/...` container
+  paths, unaffected by the script's own location on disk.
+
+### New: coverage and per-station temperature plots (`bulgaria_rila_pirin/outputs/meteo_plots/`)
+Two new scripts in `scripts/`, both runnable from the host venv directly (no
+Docker needed — pandas/matplotlib only):
+- **`plot_station_coverage.py`** → `station_coverage_timeline.png` (Gantt-style
+  bar per station, colored by `overall_status`, labeled with name + altitude)
+  and `station_data_quality.png` (stacked %complete/partial/gap per station,
+  sorted worst-to-best, station labels annotated with the **exact hour count
+  of real (non-gap) readings**, e.g. `Bansko (41,101 h)`).
+- **`plot_station_daily.py`** → one PNG per station (28 with data + a
+  `N211_Makedonia_Hut.png` placeholder noting it never reported), each with:
+  daily min/max/mean temperature (line + shaded band) over the station's full
+  record, a coverage strip (complete/partial/gap) below the time axis, and a
+  day-count-by-category panel on the side — every plot is self-contained
+  context (station name, altitude, exact date range, how much of the curve is
+  actually backed by real readings).
+- Colors follow the Claude Code `dataviz` skill's validated status palette
+  (good/warning/serious/critical-equivalent hues, CVD-checked) rather than
+  ad-hoc colors — `good`→green `#0ca30c`, `partial`→amber `#fab219`,
+  `mostly_gap`/`gap`→red `#d03b3b`, `no_data`→gray `#898781`.
+- Fixed one round of legend-overlapping-data issues on both summary plots by
+  moving legends outside the axes (`bbox_to_anchor`) instead of `loc="lower/upper right"`.
+
+### Opened: discussion on the actual validation methodology (ML residual bias-correction)
+Carried over detailed reasoning from a prior thesis-planning chat (not done in
+this Claude Code session, but directly informing the next implementation
+step): the plan is to run TopoPyScale in **point mode** at station locations
+(already scaffolded — see `config_point.yml` and the 2026-08-07 entries above
+— but currently scoped to the single test day 2023-03-15 only), compute the
+**residual** (`T_obs - T_topo`) at each station/timestamp, then train a
+Random Forest / XGBoost model to **predict that residual** from terrain
+features (elevation difference, slope, aspect, SVF) and time features
+(hour, month), validated with **leave-one-station-out cross-validation**
+(spatial generalization to unmonitored locations is the actual deliverable,
+not temporal accuracy at known stations — pooling timestamps across stations
+into a random split would leak each station's own bias into training).
+Grounded in Ben Bouallègue et al. 2023 (MWR, ECMWF forecast-error
+post-processing with RF, same bias-then-residual decomposition) plus several
+terrain-aware RF/XGBoost downscaling precedents.
+
+**Discussed this session:**
+1. **Time range for the point-mode run — RESOLVED, see below** (was left open
+   earlier in this same session; decided a few hours later after a dedicated
+   best-day search).
+2. **Which stations count as usable for training/validation — still open.**
+   Leaning towards `good`-status stations only, possibly adding
+   `partial`-status ones "if they bring real value" (user's phrasing) —
+   excluding `mostly_gap` (Breznitsa, Lovna_Hut, Tevno_ezero_Hut) and
+   `no_data` (Makedonia_Hut) — but not finalized. `station_coverage_summary.csv`'s
+   `overall_status` column is ready to filter on whenever this is settled.
+
+### Validation date decided: 2022-11-27 / 2022-11-28
+Built `bulgaria_rila_pirin/scripts/find_best_coverage_day.py` to search
+`stations_daily_full_history.csv` for the day(s) with the most stations at
+`coverage == complete` (≥20/24 hours) network-wide — the direct answer to
+"which single day has the best station coverage," reusing this session's own
+daily-aggregation output rather than the older (differently-thresholded)
+`meteo_overlap_analysis.py` output from 2026-08-07.
+- **Best raw coverage** (no elevation constraint): 21/28 stations complete,
+  tied across four 2026 days (07-05, 07-06, 07-31, 08-01) — but all of them
+  fall within ERA5's ~2-3 month final-release lag from today (2026-08-13), so
+  only the preliminary/revisable ERA5T product would exist for them. Rejected
+  on those grounds alone, before even considering elevation.
+- **Added the real deciding constraint**: elevation matters most for
+  validating the lapse-rate correction, so **Musala (2925m, the DEM's highest
+  point) must be complete**, and as many of the other high-elevation stations
+  (≥1400m: Musala, Tevno_ezero_Hut, Rilski_ezera_Hut, Malyovitsa_Hut,
+  Lovna_Hut, Semkovo, Ortsevo, Medeni_polyani, Popovi_livadi) as possible
+  should be complete too. Musala has been unreliable since early 2023 (see
+  the 2026-08-07 entries above) and its `complete` days only exist
+  2019-08-24 to 2024-02-28 — this alone rules out any 2024+ candidate.
+- Filtering to Musala-complete days and ranking by count of high-elevation
+  stations complete found a clear top tier: **7 of 9 high-elevation stations
+  complete (incl. Musala) + 19/28 total**, tied across six days in three
+  back-to-back pairs: **2022-10-29/30-31 and 11-01/02, 11-20, 11-26,
+  11-27/28, 12-06/07, 12-10/11** (top tier specifically: 11-27, 11-28, 12-06,
+  12-07, 12-10, 12-11). On every one of these, the only missing
+  high-elevation stations are Tevno_ezero_Hut and Lovna_Hut — both
+  `mostly_gap` overall (8.7% and 4.7% lifetime complete), so they were never
+  going to be available on any candidate day regardless of which one is
+  picked.
+- **Decision: 2022-11-27 and 2022-11-28.** Safely inside final-release ERA5
+  (almost 4 years old), high-elevation-prioritized, and it's a genuine
+  2-day window rather than a single day, giving the residual model
+  slightly more temporal spread within the same well-covered stretch.
+  Complete that day: Musala, Rilski_ezera_Hut, Malyovitsa_Hut, Semkovo,
+  Ortsevo, Medeni_polyani, Popovi_livadi, Selishte, Obidim, Beli_Iskar,
+  Bansko, Dolno_Draglishte, Velingrad_Zayche_blato, Breznitsa, Velingrad,
+  Mosomishte, Garmen, Riltsi, Boboshevo (19 stations). Missing:
+  Tevno_ezero_Hut, Lovna_Hut, Bodrost, Sarnitsa, Grashevo, Pletena,
+  Dabnitsa, Golemo_selo, Balanovo (9 stations).
+
+### Archived the 2023-03-15 toposub trial before starting the new run
+To avoid mixing the old single-day full-grid trial with the new
+Nov-2022 point-mode validation run, moved everything date-specific into
+`bulgaria_rila_pirin/archive/2023-03-15_trial/` (~6GB):
+- `outputs/`: `output.nc`, `ds_solar.nc`, `df_centroids.pck(.bak)`,
+  `downscaled/` (all 500 per-cluster files), the 3 ERA5 comparison rasters,
+  the diff raster, `t_2023-03-15_hourly_25m.tif`, `tmp/`.
+- `inputs_climate/`: `PLEV_2023.nc`/`SURF_2023.nc` (relative symlinks,
+  verified they still resolve after the move) + `daily/`, `yearly/`, `tmp/`
+  — confirmed this was genuinely only ever one day's data despite the
+  "yearly" folder name (~1.5MB total).
+- `configs/`: snapshots of `config.yml` and `config_point.yml` exactly as
+  they were for this trial (`start`/`end: 2023-03-15`), for reproducibility.
+- **Deliberately left in place, not archived** — verified by reading
+  `compute_horizon()`'s actual source (`Topoclass.compute_horizon`), which
+  depends only on the DEM and azimuth increments, never on the configured
+  date range: `outputs/da_horizon.nc` (7GB) and `outputs/ds_param.nc`
+  (2.3GB), both terrain-only and fully reusable for the new date. Also left
+  `outputs_points/ds_param.nc` (pre-seeded copy for point mode) and
+  `outputs/meteo_plots/` (unrelated to the downscaling trial) untouched.
+- **`.gitignore` gap found and fixed**: `df_centroids.pck`/`.pck.bak` (small,
+  ~217KB each) weren't covered by any existing rule once moved out of the
+  blanket-ignored `outputs/` path — added `*.pck` and `*.pck.bak` to
+  `.gitignore`, matching the same reasoning as the existing `*.pkl`/`*.pckl`
+  rules (cache/intermediate binary artifacts, not meant for version control).
+
+### Remaining checklist (updated again)
+- [ ] Decide final station filter for training/validation (good-only vs
+  good+useful-partial) — still open, see above.
+- [ ] Update `config_point.yml`: `start`/`end` → `2022-11-27`/`2022-11-28`,
+  point it at a fresh multi-day ERA5 pull for that window (current
+  `inputs/climate/` is now empty after archiving).
+- [ ] Run the point-mode pipeline (`get_era5` → `compute_dem_param` [cache
+  hit] → `extract_topo_param` → `compute_solar_geometry` → `compute_horizon`
+  [cache hit, reused from the archived trial] → `downscale_climate` →
+  `to_netcdf`) for the 2022-11-27/28 window at all station locations —
+  **do not start until the user has re-confirmed**, per this session's
+  explicit sequencing request (archive → update progress/plan → check back →
+  only then run).
+- [ ] Once downscaled point output exists, compute `T_obs - T_topo` residuals
+  against the METER.AC hourly observations for these two days and begin the
+  ML bias-correction methodology (see the "Opened: discussion..." section
+  above for the full plan).
+
+Both feed directly into scoping the next ERA5 download and point-mode run, so
+**do not start that run until these two are resolved** — check with the user
+first if picking this back up.
