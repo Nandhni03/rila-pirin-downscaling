@@ -1,12 +1,12 @@
 project:
-  name: Bulgaria Rila-Pirin Test Run - Station Validation
-  description: Point-sampling downscaling at all 28 METER.AC station locations for 2022-11-27/2022-11-28 (best Musala + high-elevation station coverage window), to validate against observed hourly min/max/mean air temperature.
+  name: Bulgaria Rila-Pirin Test Run
+  description: Single-day (2023-03-15, hourly) TopoPyScale test run for the Rila-Pirin thesis project, learning the pipeline end-to-end before the full multi-year run.
   authors:
     - Nandhni, MSc GIS, West University of Timisoara
-  date: 2026-08-13
+  date: 2026-07-16
   directory: /app/bulgaria_rila_pirin
-  start: 2022-11-27
-  end: 2022-11-28
+  start: 2023-03-15
+  end: 2023-03-15
   split:
     IO: False
     time: 1
@@ -17,7 +17,7 @@ project:
     downscaling_method: multicore
     setting:
       multicore:
-        CPU_cores: 20
+        CPU_cores: 20 # 4 otherwise, but on the linux computer i do have 21 cores
       dask:
         n_workers: 4
         threads_per_worker: 1
@@ -47,13 +47,10 @@ dem:
   solar_position_method: nrel_numpy
 
 sampling:
-  method: points
-  points:
-    csv_file: station_list.csv
-    name_column: stn_number
+  method: toposub
   toposub:
     clustering_method: minibatchkmean
-    n_clusters: 500
+    n_clusters: 500  # PLACEHOLDER -- to be revised via search_number_of_clusters() before the real run
     random_seed: 2
     clustering_features: {'x':1, 'y':1, 'elevation':1, 'slope':1, 'aspect_cos':1, 'aspect_sin':1, 'svf':1}
     clustering_mask: inputs/dem/mask.tif
@@ -63,7 +60,7 @@ toposcale:
   LW_terrain_contribution: True
 
 outputs:
-  directory: outputs_points
+  directory: outputs
   variables: all
   file:
     clean_outputs: False

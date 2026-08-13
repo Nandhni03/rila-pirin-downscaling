@@ -24,7 +24,11 @@ __pycache__/
 *.zip
 *.zarr/
 bulgaria_rila_pirin/data/
-bulgaria_rila_pirin/outputs/
+bulgaria_rila_pirin/outputs/*
+!bulgaria_rila_pirin/outputs/meteo_plots/
 bulgaria_rila_pirin/outputs_points/
 *.pkl
 *.pckl
+*.pck
+*.pck.bak
+*.docx

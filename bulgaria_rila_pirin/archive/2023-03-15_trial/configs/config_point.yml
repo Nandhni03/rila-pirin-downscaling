@@ -1,12 +1,12 @@
 project:
   name: Bulgaria Rila-Pirin Test Run - Station Validation
-  description: Point-sampling downscaling at all 28 METER.AC station locations for 2022-11-27/2022-11-28 (best Musala + high-elevation station coverage window), to validate against observed hourly min/max/mean air temperature.
+  description: Point-sampling downscaling at METER.AC station locations for 2023-03-15, to validate against observed hourly min/max/mean air temperature.
   authors:
     - Nandhni, MSc GIS, West University of Timisoara
-  date: 2026-08-13
+  date: 2026-08-07
   directory: /app/bulgaria_rila_pirin
-  start: 2022-11-27
-  end: 2022-11-28
+  start: 2023-03-15
+  end: 2023-03-15
   split:
     IO: False
     time: 1
