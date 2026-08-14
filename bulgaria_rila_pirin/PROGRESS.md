@@ -1031,24 +1031,285 @@ Nov-2022 point-mode validation run, moved everything date-specific into
   `.gitignore`, matching the same reasoning as the existing `*.pkl`/`*.pckl`
   rules (cache/intermediate binary artifacts, not meant for version control).
 
-### Remaining checklist (updated again)
-- [ ] Decide final station filter for training/validation (good-only vs
-  good+useful-partial) — still open, see above.
-- [ ] Update `config_point.yml`: `start`/`end` → `2022-11-27`/`2022-11-28`,
-  point it at a fresh multi-day ERA5 pull for that window (current
-  `inputs/climate/` is now empty after archiving).
-- [ ] Run the point-mode pipeline (`get_era5` → `compute_dem_param` [cache
-  hit] → `extract_topo_param` → `compute_solar_geometry` → `compute_horizon`
-  [cache hit, reused from the archived trial] → `downscale_climate` →
-  `to_netcdf`) for the 2022-11-27/28 window at all station locations —
-  **do not start until the user has re-confirmed**, per this session's
-  explicit sequencing request (archive → update progress/plan → check back →
-  only then run).
-- [ ] Once downscaled point output exists, compute `T_obs - T_topo` residuals
-  against the METER.AC hourly observations for these two days and begin the
-  ML bias-correction methodology (see the "Opened: discussion..." section
-  above for the full plan).
+### Point-mode pipeline run — started, live log
+User gave full autonomy to run this unattended for hours: launch, diagnose,
+patch, and relaunch on failure without stopping to ask, logging every fix
+here as it happens.
+- Regenerated `inputs/dem/station_list.csv` for **all 28 stations** (was 17,
+  missing Musala/N306 among others) via new `scripts/build_station_list.py`
+  (same lat/lon→EPSG:32634 reprojection approach as the original 17-station
+  version). Downscaling all 28 costs almost nothing extra at this scale and
+  fully defers the still-open "which stations count for training" question
+  to the ML stage — no rerun risk later regardless of how that's decided.
+- Copied (not hardlinked — deliberately, see discussion below)
+  `outputs/da_horizon.nc` (7GB) into `outputs_points/` alongside the
+  already-present `ds_param.nc`, since both are terrain-only and verified
+  (by reading `Topoclass.compute_horizon`'s actual source) to never depend
+  on the configured date range.
+- Wrote `bulgaria_rila_pirin/scripts/pipeline_point.py` (adapted from
+  `ex1_norway_finse/pipeline_point.py`, ending in `to_netcdf()` instead of
+  `to_cryogrid()` to match this project's convention) and launched it in the
+  background against the updated `config_point.yml`
+  (`start`/`end: 2022-11-27`/`2022-11-28`).
 
-Both feed directly into scoping the next ERA5 download and point-mode run, so
-**do not start that run until these two are resolved** — check with the user
-first if picking this back up.
+**Bug #9 (new, found on first launch): `fetch_era5.py`'s own
+`time_step_dict` has the exact same uppercase-only case-sensitivity issue as
+Bug #6, in a different function.** `retrieve_era5()` (used by `get_era5()`)
+hardcodes `time_step_dict = {'1H': [...], '3H': [...], '6H': [...]}`; with
+`climate.era5.timestep: 1h` (lowercase, required since Bug #3),
+`time_step_dict.get('1h')` silently returned `None` for every day, which
+became the CDS API request's `time` field →
+`400 Bad Request: request['time'][0]: None is not of type 'string'`. **This
+never surfaced during the original 2023-03-15 download** because that
+ERA5 data was fetched successfully *before* Bug #3's fix switched the config
+to lowercase — later pipeline attempts just found the cached daily files and
+skipped re-downloading, so this exact code path was never actually exercised
+with a lowercase timestep until this run (the first fresh, uncached
+`get_era5()` call since Bug #3). **Fix** (container-image-only, same caveat
+as Bugs #6/#7 — lost on image rebuild, not just restart):
+`sed`-appended a line right after the dict literal in
+`/usr/local/lib/python3.13/site-packages/TopoPyScale/fetch_era5.py`:
+`time_step_dict.update({'1h': time_step_dict['1H'], '3h': time_step_dict['3H'], '6h': time_step_dict['6H']})`.
+Confirmed no leftover partial daily files from the failed attempt before
+relaunching (clean retry, no stale-cache risk).
+- Relaunched (2nd attempt) — **Bug #9's fix confirmed working**: ERA5 SURF
+  daily files for both 2022-11-27 and 2022-11-28 downloaded and unzipped
+  successfully this time (24 hourly timesteps each, correct 8×10 grid,
+  verified by opening both with xarray). Got further, then hit a new,
+  unrelated failure:
+
+**Bug #10: `retrieve_era5()` auto-creates `inputs/climate/daily/` but never
+`inputs/climate/yearly/`**, and this session's earlier archiving step (run as
+the host user, not root, via plain `mv`) moved the *entire* `yearly/`
+directory into `archive/2023-03-15_trial/` along with its contents — so the
+directory didn't exist at all anymore for `cdo mergetime` to write into.
+Manifested as a misleading `Error (cdf__create): .../SURF_2022.nc: Permission
+denied` (netCDF/cdo's generic error for "parent directory doesn't exist" is
+worded like a permissions failure, not a missing-path one — easy to
+misdiagnose as another root-ownership issue like Bugs #1/#8's category, but
+confirmed by direct inspection this was a genuinely absent directory, not a
+permissions mismatch). **Fix**: recreated
+`inputs/climate/yearly/` via `docker compose exec ... mkdir -p` (as root,
+matching the container-created `daily/`/`tmp/` siblings' ownership, rather
+than as the host user, to keep the whole `climate/` tree's ownership
+consistent going forward). Not a code patch this time, just a missing
+directory — nothing to lose on image rebuild.
+- Relaunched (3rd attempt) — **Bugs #9 and #10's fixes both confirmed
+  working**: ERA5 SURF+PLEV daily files downloaded (SURF was skipped, found
+  already-downloaded from attempt #2 — the `file_exist` cache check works
+  correctly across relaunches, as expected) and merged into yearly files with
+  no errors. `compute_dem_param()` cache-hit on `ds_param.nc` correctly.
+  Got further, into `extract_topo_param()`, then hit a third new bug:
+
+**Bug #11: another pandas-3.0 strict-dtype issue, same family as Bugs
+#7/#8** (chained-assignment / Arrow-string-dtype), this time in
+`topo_param.py`'s `extract_pts_param()` — the function used specifically by
+point-mode (never exercised by the earlier toposub full-grid run, which is
+why this is only surfacing now on the very first real point-mode attempt).
+`df_pts[[...]] = 0` initializes the elevation/slope/aspect/svf columns with
+integer `0`, so pandas infers `int64` dtype; a later per-point
+`.loc[i, [...]] = np.array((float values))` assignment (e.g. writing a real
+elevation like `1626.048`) then hits pandas 3.0's strict type-checking and
+raises `TypeError: Invalid value '1626.0481247738776' for dtype 'int64'`
+instead of silently upcasting like older pandas did. **Fix**
+(container-image-only, same caveat as every other patch this session):
+changed `= 0` → `= 0.0` at line 87, so the columns are float64 from
+creation. One-character diff.
+- Relaunched (4th attempt) — **Bug #11's fix confirmed working**: got all the
+  way through `extract_topo_param()` (all 28 stations reprojected/sampled
+  fine, `df_centroids.pck` saved), `compute_solar_geometry()`, and
+  `compute_horizon()` (cache-hit on the copied `da_horizon.nc` — confirms
+  that copy-not-hardlink decision paid off, zero recompute) into
+  `downscale_climate()` — furthest yet. Hit a **repeat of Bug #5** from the
+  original toposub run: `downscale_climate()` globs for `PLEV*.nc`/`SURF*.nc`
+  directly in `inputs/climate/`, but the merge step puts them in
+  `inputs/climate/yearly/` → `OSError: no files to open`. Same fix as before,
+  just for the new year: symlinked
+  `inputs/climate/{PLEV,SURF}_2022.nc -> yearly/{PLEV,SURF}_2022.nc`. Not a
+  code patch — a per-year setup step that will need repeating for any future
+  year's climate data (worth automating in `pipeline_point.py` itself if this
+  project ends up running many different date windows).
+- Relaunched (5th attempt) — **SUCCESS.** All remaining cached steps
+  (`extract_topo_param`, `compute_solar_geometry`, `compute_horizon`)
+  loaded from cache correctly, confirming attempt #4's work wasn't wasted.
+  `downscale_climate()` ran clean for all 28 stations (`t,q,p,tp,ws,wd` +
+  `LW,SW` radiation) in **242 seconds** — vastly faster than the 500-cluster
+  full-grid run's ~37 minutes for `downscale_climate()` alone, as expected at
+  this much smaller point count. `to_netcdf()` wrote the merged result to
+  **`bulgaria_rila_pirin/outputs_points/output.nc`**. `Pipeline finished`,
+  no traceback.
+
+**Output structure**: `xarray.Dataset`, dims `(point_name: 28, time: 48)` —
+28 stations × 48 hourly timesteps (2022-11-27 00:00 through 2022-11-28
+23:00), confirming the earlier product-count correction (28 stations → 28
+files, not 56 or 38 — the time dimension just grows to cover both days
+inside each file). All 28 individual `down_pt_*.nc` files also present in
+`outputs_points/downscaled/`.
+
+**Sanity check performed** (same methodology as the original 2023-03-15
+toposub validation):
+- Temperature range across all 28 points × 48 hours: **-11.89°C to +6.69°C**,
+  mean **-0.32°C** — physically plausible for late November in the
+  Rila-Pirin mountains.
+- **Elevation vs. mean-temperature correlation: -0.987** — near-identical to
+  the original toposub run's -0.98 for a completely different date, strong
+  independent confirmation the lapse-rate physics is behaving consistently
+  across runs.
+- Coldest: **Musala (N306, 2925m) at -9.54°C mean** — highest station,
+  coldest result, as expected, and specifically the station this whole
+  validation window was chosen to include.
+- Warmest: **Riltsi (N110, 378m) at +4.94°C mean** and **Boboshevo (N235,
+  375m) at +4.62°C mean** — lowest-elevation stations, warmest results.
+- Monotonic cold-with-elevation trend holds throughout the full station list
+  (see run log / re-run the pandas snippet above for the full table), with
+  only minor (~0.2-0.5°C) local noise between adjacent-elevation stations —
+  expected from real aspect/terrain differences, not a red flag.
+
+**All 5 bugs found this session (#7 reused from before this session,
+#9/#10/#11 new) are now documented above with fixes.**
+
+**Follow-up, same day: `docker/Dockerfile` updated to bake in every patch**
+(Bugs #6, #7, #9, #11 — the two originally in the Dockerfile from
+2026-08-06 were already covered) so none of them are lost on a future image
+rebuild. Also pinned `TopoPyScale==0.3.3` (was unpinned) — every patch
+targets exact line text specific to that version, so an unpinned upgrade
+could silently stop matching (patch no-ops) or match something unintended.
+**Verified each new patch before trusting it**: downloaded a pristine copy of
+`TopoPyScale==0.3.3` via `pip download` into a scratch dir inside the
+container, applied the exact same sed/python commands the Dockerfile now
+uses, confirmed all 4 patterns matched exactly once, and `py_compile`'d the
+resulting files clean — so this isn't just "looks right," it's confirmed to
+actually apply correctly against a fresh install, not just the
+already-patched live container. Bug #10 (missing `yearly/` directory) needed
+no Dockerfile change — it wasn't a code bug, just a directory that a fresh
+container will create automatically via `docker compose exec ... mkdir -p`
+the same way this session did.
+
+### Remaining checklist (updated again)
+- [x] Run the point-mode pipeline for all 28 stations at 2022-11-27/28 —
+  **done, see above.** `output.nc` and 28 `down_pt_*.nc` files ready in
+  `outputs_points/`.
+- [ ] Decide final station filter for training/validation (good-only vs
+  good+useful-partial) — still open, see above. The **19 stations complete
+  on both 2022-11-27 and 2022-11-28** (listed in "Validation date decided"
+  above) are the ones that can actually be validated against real
+  observations from this run; the other 9 were downscaled too but have no
+  usable ground truth for this specific window.
+- [x] Update `config_point.yml`: `start`/`end` → `2022-11-27`/`2022-11-28`.
+- [x] Run the point-mode pipeline for all 28 stations — **done, see above.**
+- [x] Compute `T_obs - T_topo` residuals for the 19 validated stations —
+  **done, see "Residuals computed" below.**
+
+(Superseded note: this used to say not to start the point-mode run until both
+open items above were resolved. The time-range question was resolved later
+the same session — see "Validation date decided" below — and the run was
+started with the user's explicit go-ahead to downscale all 28 stations
+regardless of the still-open training-filter question, since that filter can
+be applied after the fact with no rerun needed.)
+
+## Session update — 2026-08-14: Dockerfile patches verified, residuals computed, QGIS export, roadmap notes
+
+### `docker/Dockerfile` patch verification
+Before trusting yesterday's Dockerfile additions (Bugs #6/#7/#9/#11 baked in,
+`TopoPyScale` pinned to `0.3.3`), verified them properly rather than just
+eyeballing the diff: downloaded a **pristine** copy of `TopoPyScale==0.3.3`
+via `pip download` into a scratch dir inside the container (not the
+already-patched live install), applied the exact sed/python commands now in
+the Dockerfile against it, confirmed all 4 patterns matched exactly once,
+and `py_compile`'d the results clean. Confirms the Dockerfile will actually
+reproduce a working setup on a real rebuild, not just "looks plausible."
+Cleaned up the scratch dir afterward.
+
+### Point-mode run timing
+`downscale_climate()` itself: **242.0 seconds** (printed by the pipeline's
+own log) for all 28 stations × 48 hourly timesteps. Cross-checked against
+file timestamps (`df_centroids.pck` cache-hit at 18:49:42 → `output.nc`
+written 18:53:45, a 243s gap) — confirms the **entire successful run (attempt
+5), start to finish, took essentially just those ~4 minutes**, since every
+other step (ERA5 fetch, DEM params, solar geometry, horizon) was already
+cached from earlier failed attempts. For comparison, the original 500-cluster
+full-grid run's `downscale_climate()` alone took ~37 minutes — point mode at
+28 stations is ~9x faster on that step.
+
+### Residuals computed
+Wrote `bulgaria_rila_pirin/scripts/compute_residuals.py`: joins `output.nc`
+(T_topo), `stations_hourly_full_history.csv` (T_obs, filtered to the 19
+stations confirmed `complete` on both 2022-11-27 and 2022-11-28), and
+`df_centroids.pck` (terrain features: DEM elevation, station's own reported
+elevation, slope, aspect_cos/sin, svf) into one table,
+`bulgaria_rila_pirin/data/residuals_2022-11-27_28.csv` (912 rows — 19
+stations × ~48 hours, two stations short a few hours from their own partial
+coverage: N097 has 47, N098 has 42).
+
+**Raw TopoScale baseline (no ML correction) — the number any bias-correction
+model needs to beat**:
+- Overall: mean residual **+0.01°C** (unbiased in aggregate), **RMSE 2.21°C**,
+  **MAE 1.59°C**.
+- Per-station bias ranges from **-2.3°C (Riltsi, 378m)** to **+2.3°C (Obidim,
+  1213m)** — real, non-random station-specific offsets survive even though
+  the network-wide aggregate is unbiased.
+- Correlation of residual with elevation-difference (DEM vs. station's real
+  elevation): **0.01** (negligible — the differences are only a few to ~20m on
+  a 25m grid, too small to explain much on their own). With hour-of-day:
+  **0.30** (a real diurnal pattern in the error, useful ML signal). With SVF:
+  **-0.07** (weak alone, may still interact with other features nonlinearly).
+- **Musala (highest station, 2925m): TopoScale runs 1.65°C too warm on
+  average**, RMSE 2.41°C — the hardest point, as expected for the most
+  extreme/exposed terrain.
+
+### QGIS spatial export
+User needed to visualize `output.nc` in QGIS but it opened positioned near
+"Africa" (Null Island) — diagnosed as `output.nc` having **no spatial
+coordinates at all** (`point_name`, `time`, `reference_time` only; no x/y/
+lat/lon), so QGIS's netCDF importer was falling back to plotting raw indices
+as if they were degrees. `output.nc` was never going to render correctly as
+a raster — it's a site/time-series table, not a spatial grid.
+
+**Fix**: wrote `bulgaria_rila_pirin/scripts/export_output_to_gpkg.py`,
+joining each station's real `station_list.csv` coordinates (EPSG:32634) onto
+its `output.nc` values in long format (one row per station × hour, so QGIS's
+Temporal Controller can animate through the 48 hours using the `time`
+field). Output: `bulgaria_rila_pirin/outputs_points/output_points_for_qgis.gpkg`
+(28 stations × 48 hours = 1,344 point features; verified CRS and bounds fall
+correctly inside the known DEM extent this time). Columns: `node`, `Name`,
+`elevation_m`, `time`, `t` (K), `t_celsius` (°C, added for convenience),
+`ws`, `wd`, `tp`, `q`, `p`, `LW`, `SW`.
+- Also confirmed **`landform.tif` does not exist anywhere in this project**
+  and was never generated — it's a toposub-mode-only output (per-pixel
+  cluster-ID raster), and neither `pipeline.py` nor `pipeline_point.py` ever
+  called the method that writes it. It's also the exact thing Bugs #7/#8
+  broke in the original run, which is why `paint_back.py` exists as a
+  workaround (though that produces a temperature raster for 2023-03-15
+  specifically, now archived, not a landform/cluster-ID grid).
+
+### Roadmap notes for next steps (recorded here, not yet acted on)
+User named four things to tackle next, in no particular stated order:
+1. **Decide the ML bias-correction methodology properly.** The Phase
+   1 (this 2-day dataset, methodology validation) vs. Phase 2 (multi-year
+   run, real training) framing was proposed this session — see "Opened:
+   discussion..." above — model recommendation for Phase 1 was Ridge
+   regression + a small regularized Random Forest, evaluated by
+   leave-one-station-out CV against the 2.21°C raw-RMSE baseline above.
+   **Not yet built or agreed on** — paused here to record the other three
+   items first.
+2. **Set up a NOAA option for automated meteo station data.** User's own
+   words — likely to get an automated/API-based station data feed rather
+   than the manual scraping approach used for METER.AC, either as a
+   supplement or an alternative source. **No details worked out yet** — needs
+   its own scoping session (which NOAA product/API, which stations near the
+   AOI, how it'd combine with or replace METER.AC data).
+3. **Formulate a proposal/concept document + proof of concept**, to present
+   for feedback from the user's teacher/advisor. Not started.
+4. **After the roadmap above is finalized**, create a separate `STATUS.md`
+   — explicitly **not** a full historical log like this file, but a
+   current-state-focused document ("more on point data," per the user's
+   phrasing) — deferred until the roadmap itself is settled, so it reflects
+   final decisions rather than in-progress ones.
+
+**Small near-term to-do (reminder for next session)**: extend
+`export_output_to_gpkg.py` (or add a sibling script) to also pull in the
+observed METER.AC values for the 19 validated stations, so the GeoPackage
+has T_obs alongside T_topo per station/hour — lets the comparison be done
+visually in QGIS (e.g. two symbol layers, or a computed-field showing the
+residual directly) instead of only in the residuals CSV. User asked for this
+right after the QGIS export above; explicitly deferred to next time.
