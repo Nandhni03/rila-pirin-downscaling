@@ -69,6 +69,15 @@ RUN sed -i "/'6H': \['00:00', '06:00', '12:00', '18:00'\]}/a\\    time_step_dict
 RUN sed -i "s/df_pts\[\['elevation', 'slope', 'aspect', 'aspect_cos', 'aspect_sin', 'svf'\]\] = 0$/df_pts[['elevation', 'slope', 'aspect', 'aspect_cos', 'aspect_sin', 'svf']] = 0.0/" \
     /usr/local/lib/python3.13/site-packages/TopoPyScale/topo_param.py
 
+# (7) Bug #12 (found via source research before ever hitting it live, ahead of
+#     the 1980-2025 multi-year downscaling work): topo_scale_zarr.py's
+#     ClimateDownscaler has ITS OWN THIRD copy of the same uppercase-only
+#     tstep_dict — identical issue to Bugs #6/#9, a different file again.
+#     Patched preemptively so the dask/zarr downscaling path doesn't hit the
+#     exact same wall the classic path hit twice already.
+RUN sed -i "s/tstep_dict = {'1H': 1, '3H': 3, '6H': 6}/tstep_dict = {'1H': 1, '3H': 3, '6H': 6, '1h': 1, '3h': 3, '6h': 6}/" \
+    /usr/local/lib/python3.13/site-packages/TopoPyScale/topo_scale_zarr.py
+
 ENV HISTFILE=/root/.bash_history_persist
 ENV HISTSIZE=10000
 ENV HISTFILESIZE=20000
