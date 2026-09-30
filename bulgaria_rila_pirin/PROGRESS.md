@@ -1313,3 +1313,135 @@ has T_obs alongside T_topo per station/hour — lets the comparison be done
 visually in QGIS (e.g. two symbol layers, or a computed-field showing the
 residual directly) instead of only in the residuals CSV. User asked for this
 right after the QGIS export above; explicitly deferred to next time.
+
+## Session update — 2026-09-29: multi-year (1980-2025) downscaling wrapper — design, build, pilot
+
+### Goal and research first
+User wants the full 1980-2025 downscaled record eventually, plus a
+resumable, self-debugging, well-logged tool to produce it (rather than
+hand-running `pipeline_point.py` once per year) — explicitly asked to
+consult TopoPyScale's own docs/source first rather than inventing something,
+matching this project's "use the original creators' code" instinct.
+
+**Findings from reading the actual installed source** (more reliable than
+the sparse official docs, which barely mention any of this):
+- `pipeline.py` (root) is confirmed to be exactly the canonical 6-step
+  template from the readthedocs quickstart.
+- The docs' use-cases page cites a real precedent at this scale: the
+  "Genesis" project used TopoPyScale for **30 years of ERA5 hourly data**
+  across several archipelagos — 45 years is within the tool's proven range.
+- Real Zarr support exists: `fetch_era5.py`'s `convert_netcdf_stack_to_zarr()`
+  (merges yearly NetCDF into one `ERA5.zarr`) and `topo_scale_zarr.py`'s
+  `ClimateDownscaler` class (dask/zarr downscaling path, activated via
+  `climate.era5.zarr_store` in config — exactly `ex2_romania_retezat`'s own
+  reference config). **Two gotchas found by reading this code before ever
+  running it**: (1) `ClimateDownscaler.__init__` has its own THIRD copy of
+  the uppercase-only `tstep_dict` bug (Bugs #6/#9's twin) — patched
+  preemptively as **Bug #12**, both live and in the Dockerfile, verified
+  against a pristine `pip download` the same way as every other patch this
+  project has made; (2) neither `convert_netcdf_stack_to_zarr()` nor the
+  output-side `setup_output_store()` are actually resumable — both call
+  `.to_zarr(mode='w')` unconditionally, so re-running either to "resume"
+  would silently wipe prior progress, not continue it.
+- The library's own built-in time-chunking feature (`project.split.IO`) is
+  explicitly flagged by its own source comment as *"prone to bugs... Not
+  compatible with Zarr system"* — deliberately not built on.
+
+### Design decision: proven multicore path per year, Zarr as final export only
+Chose **not** to route the live multi-year compute through the dask/zarr
+`ClimateDownscaler` path, despite it being the "fancier" built-in option.
+Reasoning: this project has hit a new bug on essentially every
+first-time-exercised code path so far (6 bugs in the original toposub run,
+3 more in the first point-mode run) — deliberately introducing a
+barely-exercised, non-resumable-by-default code path into a job meant to run
+unattended for days-to-weeks is the wrong risk tradeoff. Instead: reuse the
+**already-validated** classic multicore/NetCDF path (proven at 242s for 28
+stations × 2 days) once per year, and treat Zarr purely as a **final export
+format** — a simple, low-risk `xr.concat` + `.to_zarr()` over completed
+years' `output.nc` files, using plain xarray rather than the library's more
+complex internals. This still delivers exactly what the user asked for
+("obtain them in zarr format at the end") without adding compute-path risk.
+
+### Built: `era5_batch_fetch.py` + `run_downscaling.py`
+- **`bulgaria_rila_pirin/scripts/era5_batch_fetch.py`**: custom
+  monthly-batched CDS fetch (reuses TopoPyScale's own `unzip_file()` helper
+  and variable/dataset conventions directly, only the request-batching logic
+  is new). Solves the real structural bottleneck: TopoPyScale's own
+  `fetch_era5.py` requests one CDS API call **per day** — at 1980-2025 scale
+  that's ~16,800 days × 2 datasets ≈ **33,600 requests**, risking CDS
+  rate-limiting independent of actual compute cost. Monthly batching cuts
+  this to ~1,104 requests (~30x fewer), each month's data merged into the
+  same `PLEV_{year}.nc`/`SURF_{year}.nc` yearly format the rest of the
+  pipeline already expects (via the same `cdo.mergetime` call
+  `retrieve_era5()` already uses), so nothing downstream changes.
+- **`bulgaria_rila_pirin/scripts/run_downscaling.py`**: the per-year
+  orchestrator. For each year: (1) ensure that year's ERA5 exists (fetch if
+  not), (2) symlink the three terrain-only shared caches (`ds_param.nc`,
+  `da_horizon.nc`, `df_centroids.pck` — confirmed date-independent, reused
+  as-is) into a per-year `outputs_points/yearly/<year>/` directory, (3) run
+  the proven 6-step pipeline for just that year's date range, writing its
+  own `output.nc`. **Resumability is filesystem-based** (does
+  `<year>/output.nc` already exist and open validly?) rather than a separate
+  state file that could drift from reality — matches TopoPyScale's own
+  caching philosophy. CLI: `--config`, `--start-year`/`--end-year` or
+  `--years`, `--phase {fetch,downscale,export,all}`, `--dry-run`, `--force`.
+  Logs every phase/year transition to both console and
+  **`bulgaria_rila_pirin/logs.md`** (new file — a dedicated, append-only
+  operational log for this specific tool, kept separate from this file since
+  a multi-week unattended run would otherwise flood `PROGRESS.md`; every
+  command actually run gets logged verbatim there per explicit user
+  instruction).
+- Also added a tutorial-style comment block to the root `pipeline.py`
+  explaining the 6-step flow in more depth and pointing at
+  `run_downscaling.py` for any multi-year run.
+
+### Testing so far (see `logs.md` for exact commands + live status)
+- **Dry-run smoke test**: caught and fixed a real bug on the first try — the
+  per-year `mkdir` wasn't guarded, so `--dry-run` was still creating an empty
+  directory. Fixed (`year_dir.mkdir`, `yearly_dir.mkdir`, and
+  `run_export`'s directory check all now guarded), re-ran, confirmed truly
+  zero filesystem side effects.
+- **Isolated 2-month fetch pilot** (separate scratch climate directory, not
+  the real one): found a real, important constraint — CDS rejects a
+  full-month PLEV request (6 vars x 14 pressure levels x ~744h ≈ 62,500
+  fields) with `403 cost limits exceeded`. SURF (no pressure-level
+  dimension) is fine at monthly granularity. Also learned the earlier
+  "proven 2-day PLEV request" from the 2022-11-27/28 run was actually two
+  separate 1-day requests (2,016 fields each), never tested combined — so
+  the true safe ceiling was unknown, not just "bigger than 2 days" as
+  assumed. A 7-day chunk (~14,112 fields) also failed. **3-day chunks
+  (~6,048 fields) confirmed working** (session picked back up 2026-09-30
+  after the prior session/container ended mid-pilot — file-existence checks
+  meant resuming just skipped the already-completed chunks, no lost work).
+  **Also added concurrency**: the fetch was running strictly sequentially
+  (one CDS request at a time, each waiting out its full queue turn before
+  the next was even submitted) — user flagged the wait directly, so added a
+  thread pool (`multiprocessing.dummy.Pool`, matching TopoPyScale's own
+  `retrieve_era5()` concurrency pattern — these are I/O-bound CDS-queue
+  waits, not CPU-bound work) to `era5_batch_fetch.py`. `ensure_year_climate()`
+  now takes `num_threads` (default 4) and submits that many chunks/months at
+  once. **Full blow-by-blow with exact commands in `logs.md`** — kept there
+  rather than duplicated here since this is exactly the kind of iterative
+  back-and-forth `logs.md` exists to hold without flooding this file.
+  **Status at time of this commit: pilot still in progress, not yet
+  complete** — the real 1980-2025 run has not started.
+
+### Time estimate given to the user (important — set expectations before launch)
+Fetch phase: ~1,104 sequential requests; even at a conservative 3-4 min/request
+average (month-sized multi-variable requests likely queue longer than the
+20-150s seen for the tiny 2-day test), that's **~2.5-3 days just for
+fetching**, currently unthreaded. Downscale phase: naive linear
+extrapolation from the 242s/2-days data point puts a single year around
+~12 hours, ×46 years → potentially **multiple weeks** — genuinely unknown
+until the pilot proves it out. **Told the user explicitly this will not
+finish today or even this week** — it's a multi-day-to-multi-week background
+job by nature, not something to expect completed on return.
+
+### Explicit standing instruction from user (record here so it isn't lost)
+"Don't wait for my confirmation, act responsibly, log everything you do...
+if the pilot needs edits, do them responsibly, update, try again until
+satisfactory, then start the real 1980-2025 pipeline." Proceeding on this
+basis: fix issues autonomously as they arise (same pattern as every prior
+debugging session here), verify satisfactory (not just "no traceback") before
+calling the pilot good, then launch the full range unattended. User will
+`git commit`/push themselves afterward, once back.
