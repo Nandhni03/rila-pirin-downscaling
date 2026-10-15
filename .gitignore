@@ -32,3 +32,7 @@ bulgaria_rila_pirin/outputs_points/
 *.pck
 *.pck.bak
 *.docx
+docker/.bash_history
+
+# Zarr workflow: data, caches and outputs (DEM/mask are symlinks into bulgaria_rila_pirin/inputs)
+zarr_workflow/data/

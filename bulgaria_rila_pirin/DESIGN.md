@@ -7,6 +7,32 @@ append-only operational output). If you're trying to understand a design
 choice rather than "what happened when," this is the file to read — and to
 keep updated when a design choice changes, so it doesn't go stale.
 
+## Current design (updated 2026-10-13); supersedes parts of the sections below
+
+The sections below date from 2026-09-30 and describe the CDS/NetCDF plan. Since then the design changed;
+details and evidence are in the fork's `PROGRESS.md`. In short:
+
+| Topic | 2026-09-30 plan (below) | Current design |
+|---|---|---|
+| ERA5 source | CDS, batched requests (SURF monthly, PLEV 3-day) | **Earth Data Hub** Zarr (`fetch_era5_edh.py`): a year in ~5 min, ~280 requests. ARCO-ERA5 (Google) checked: all 37 levels but chunks are 1 h x whole globe, ~4 TB per year, so only usable for short test periods |
+| Pressure levels | 14 CDS levels | EDH's 5 (600/700/850/925/1000). Known effect: high terrain ~0.5 K colder in January (1-1.7 K in inversions) |
+| Downscaler | classic `topo_scale` (NetCDF per point), Zarr only as export | **`topo_scale_zarr`**: bugs fixed, parity-tested against the classic path (1e-5), resumable via progress markers |
+| Output | per-year `output.nc`, concat to Zarr at the end | hourly `down.zarr` + daily `daily.zarr`, then daily GeoTIFFs (one file per month, one band per day) |
+| Splitting in time | one Topoclass per year | **one yearly store filled month by month** (option B): resume per month (to be implemented) |
+| Terrain caches | NetCDF/pickle, symlinked per year | to be stored as Zarr (`ds_param`, `ds_solar`, `da_horizon`); computed once, shared by all months/years |
+| Clustering | not fixed | **k = 500, elevation weight 4, other features 1**, `mask.tif` (rectangle AOI) |
+| Location | `bulgaria_rila_pirin/` | new self-contained folder `zarr_workflow/` (code + configs in git, `data/` ignored) |
+
+Why each change was made:
+- EDH instead of CDS: the CDS queue made a year take days; EDH gives the identical ERA5 (checked for
+  January 2025, differences = archive quantisation) much faster. The price is fewer pressure levels.
+- Zarr downscaler instead of classic: the reason for avoiding it (not resumable, untested) no longer
+  holds. It was fixed and tested, and a full year takes ~45 s for 500 clusters.
+- Month-by-month filling of one store: a crash loses only the current month; one store per year is
+  easier to read than 12 pieces, and it scales to 1980-2025.
+- Weight 4 / k = 500: station test (clustering error 0.54 K with weight 4 vs 0.96 K with weight 1) and
+  the cluster search (diminishing returns beyond k = 500). See PROGRESS.md.
+
 ## The problem this solves
 
 TopoPyScale's own quickstart workflow (`pipeline.py`, 6 steps) is built to
@@ -59,7 +85,7 @@ TopoPyScale itself uses for every one of its own cached steps
 (`ds_param.nc`, `da_horizon.nc`, etc. — "if the file's there, trust it and
 skip recomputing").
 
-### Zarr is the final export format, not the live processing path
+### Zarr is the final export format, not the live processing path (SUPERSEDED 2026-10-13: see "Current design")
 TopoPyScale has a real, purpose-built dask+zarr downscaling path
 (`ClimateDownscaler` in `topo_scale_zarr.py`, activated via
 `climate.era5.zarr_store` in config) — the "fancier" option. We
@@ -96,7 +122,7 @@ serving stale data. These three files are genuinely static once computed,
 so the risk is lower here than it was for that earlier decision, but the
 same reasoning applies.
 
-### ERA5 fetch is batched, not TopoPyScale's day-by-day default
+### ERA5 fetch is batched, not TopoPyScale's day-by-day default (SUPERSEDED 2026-10-13: EDH replaces CDS)
 1980-2025 is ~16,800 days. TopoPyScale's own `fetch_era5.py` requests one
 CDS API call **per day per dataset** — literal reproduction of that
 pattern would be ~33,600 requests, which risks CDS rate-limiting
