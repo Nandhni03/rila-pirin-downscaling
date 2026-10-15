@@ -1,0 +1,79 @@
+# Full year 2025, as config_2025_edh_v1 but elevation weight 2 (station-validation comparison).
+# Data and outputs live on the Linux filesystem under /data (= repo-github/rila-pirin-data on the host).
+project:
+  name: Rila-Pirin 2025 EDH elevation weight 2
+  description: Full 2025 hourly run; k=500, authors default feature weights (all 1), EDH levels 600/700/850/925/1000, rectangle AOI mask
+  authors:
+    - Nandhni, MSc GIS, West University of Timisoara
+  date: 2026-10-06
+  directory: /data/runs/2025_edh_w2
+  start: 2025-01-01
+  end: 2025-12-31
+  split:
+    IO: False
+    time: 1
+    space: None
+  climate: era5
+  extent:
+  parallelization:
+    downscaling_method: multicore
+    setting:
+      multicore:
+        CPU_cores: 20
+      dask:
+        n_workers: 4
+        threads_per_worker: 1
+        memory_target_fraction: 0.95
+        memory_limit: 1.2GB
+
+climate:
+  precip_lapse_rate: True
+  era5:
+    path: /data/era5/edh_2025        # holds ERA5.zarr for all of 2025; the run selects its period
+    product: reanalysis
+    timestep: 1h
+    plevels: [600,650,700,750,775,800,825,850,875,900,925,950,975,1000]   # EDH provides 600/700/850/925/1000
+    download_threads: 4
+    data_repository: edh
+    edh_output_format: both          # Zarr for topo_scale_zarr + yearly NetCDF for the classic path
+    edh_max_concurrency: 8
+    realtime: False
+    rm_daily: False
+    zarr_store: ERA5.zarr
+
+dem:
+  path: /app/bulgaria_rila_pirin/inputs/dem
+  file: rila_pirin_dem_25m_buffered_32634_bilinear_resampling.tif
+  epsg: 32634
+  horizon_increments: 10
+  solar_position_method: nrel_numpy
+
+sampling:
+  method: toposub
+  toposub:
+    clustering_method: minibatchkmean
+    n_clusters: 500     # user decision 2026-10-06 (diminishing returns of the cluster search)
+    random_seed: 2
+    clustering_features: {'x':1, 'y':1, 'elevation':2, 'slope':1, 'aspect_cos':1, 'aspect_sin':1, 'svf':1}   # elevation weight 2 for the station-validation comparison
+    clustering_mask: /data/terrain/mask.tif
+
+toposcale:
+  interpolation_method: idw
+  LW_terrain_contribution: True
+
+outputs:
+  directory: outputs
+  variables: all
+  file:
+    clean_outputs: False
+    clean_FSM: False
+    df_centroids: df_centroids.pck
+    ds_param: ds_param.nc
+    ds_solar: ds_solar.nc
+    da_horizon: da_horizon.nc
+    landform: landform.tif
+    downscaled_pt: down_pt_*.nc
+    zarr_store: down.zarr
+
+clean_up:
+  rm_tmp_dirs: True

@@ -3,12 +3,17 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    image: toposcale-rila-pirin
+    image: toposcale-rila-pirin:fork
     container_name: toposcale-rila-pirin
     volumes:
       - .:/app
-      - /home/icam_labs/.cdsapirc.d/credentials:/root/.cdsapirc:ro
-      - ./docker/state/bash_history:/root/.bash_history_persist
+      # TopoPyScale fork, live-mounted (on PYTHONPATH inside the image)
+      - ../fork-original-code/TopoPyScale_Bulgaria_Rila_Pirin_Mountains:/opt/TopoPyScale
+      # credentials, read-only, never baked into the image
+      - /home/icam_labs/.cdsapirc.d/credentials:/home/icam/.cdsapirc:ro
+      - /home/icam_labs/.netrc:/home/icam/.netrc:ro
+      # bulk data (ERA5 Zarr, terrain caches, runs): repo-github/rila-pirin-data, outside both repos
+      - ../rila-pirin-data:/data
     tty: true
     stdin_open: true
     command: sleep infinity
