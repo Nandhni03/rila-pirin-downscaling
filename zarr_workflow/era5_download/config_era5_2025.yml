@@ -22,7 +22,7 @@ surf_vars: [z_surf, d2m, sp, strd, ssrd, tp, t2m]       # topo_scale_zarr SURF s
 
 source:
   plev: ncar                   # ncar (THREDDS server-side subset, no queue, ~2.6 h/yr) | cds (~1 job at a time)
-  surf: cds                    # cds only: the whole year in one request
+  surf: cds                    # cds (whole year in one request; 2025 SURF already in the store) | ncar (OPeNDAP, as 2020)
 
 cds:
   workers: 2                   # jobs submitted at once; the CDS RUNS ONE per user at a time (MARS limit 1)
@@ -39,13 +39,13 @@ ncar:
   base_url: https://thredds.rda.ucar.edu/thredds/ncss/grid/files/g/d633000/e5.oper.an.pl
   max_retries: 5
   backoff_seconds: 60
-  timeout_seconds: 180         # normal request 20-45 s; some hang and are retried
+  timeout_seconds: 600         # normal 20-45 s (night), ~100 s when NCAR is busy (2026-10-27 morning); hangs are retried
 
 paths:
-  store: /app/zarr_workflow/data/era5_600-1000hPa/ERA5.zarr   # climate.path + zarr_store in the workflow config
-  raw: /app/zarr_workflow/data/era5_600-1000hPa/raw           # downloads, deleted after a verified write
-  state: /app/zarr_workflow/data/era5_600-1000hPa/state       # manifest.jsonl + months/YYYY-MM.json reports
-  logs: /app/zarr_workflow/data/era5_600-1000hPa/logs
+  store: /app/zarr_workflow/data/era5_600-1000hPa/2025/ERA5.zarr   # climate.path + zarr_store in the workflow config
+  raw: /app/zarr_workflow/data/era5_600-1000hPa/2025/raw           # downloads, deleted after a verified write
+  state: /app/zarr_workflow/data/era5_600-1000hPa/2025/state       # manifest.jsonl + months/YYYY-MM.json reports
+  logs: /app/zarr_workflow/data/era5_600-1000hPa/2025/logs
   edh_store: /app/zarr_workflow/data/era5/ERA5.zarr          # optional cross-check at the 5 shared levels
 
 store:

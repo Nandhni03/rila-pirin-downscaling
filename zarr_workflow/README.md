@@ -15,13 +15,14 @@ zarr_workflow/
                               LOG.md/REPORT.md: CDS limit, NCAR workaround, timings, comparisons)
   scripts/run_year.py         runs the whole chain for one year, month by month (resumable)
   scripts/workflow.py         building blocks: QA, daily store, GeoTIFF export, GeoTIFF checks
+  scripts/run_full_year.sh    ERA5 download + verify + run_year for one year (600-1000 hPa configs)
   notebooks/view_results.ipynb  interactive viewer (maps per day, time series, monthly means)
   notebooks/make_viewer_notebook.py  generates the notebook (its code, reviewable in git)
   data/                       NOT in git (.gitignore)
     dem/                      symlinks: 25 m DEM, mask.tif, AOI rectangle, station list
     era5/                     ERA5.zarr (+ edh_blocks/, the resumable download pieces)  [EDH, 5 levels]
-    era5_600-1000hPa/         ERA5.zarr from era5_download (14 levels) + state/ (manifest, month checks)
-    runs/2025_era5_600-1000hPa/outputs/   outputs of the 600-1000 hPa run (same layout as outputs/)
+    era5_600-1000hPa/YYYY/    ERA5.zarr from era5_download (14 levels) + state/ (manifest, month checks), one folder per year
+    runs/YYYY_era5_600-1000hPa/outputs/   outputs of the 600-1000 hPa runs (same layout as outputs/)
     outputs/                  everything the run computes (below)
     logs/                     one log file per run
 ```
@@ -71,6 +72,13 @@ python zarr_workflow/scripts/run_year.py zarr_workflow/config/config_2025_era5_6
        > zarr_workflow/data/runs/2025_era5_600-1000hPa/logs/run_$(date +%Y%m%d_%H%M).log 2>&1
 ```
 Its terrain/cluster/solar/horizon caches are copies of the EDH run's, so both runs use the same 500 clusters.
+
+Whole chain for one year in one command (ERA5 download -> status/verify -> run_year), e.g. 2020, entirely from NCAR
+(`config_era5_2020.yml` + `config_2020_era5_600-1000hPa.yml`; ds_solar is computed for that year, the DEM-only caches
+ds_param/df_centroids/da_horizon are copied into the run's outputs/ first):
+```bash
+bash zarr_workflow/scripts/run_full_year.sh 2020 > zarr_workflow/data/runs/2020_era5_600-1000hPa/logs/full_year_2020.out 2>&1
+```
 
 ## What happens, step by step
 

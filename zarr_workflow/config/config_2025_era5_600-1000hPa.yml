@@ -36,7 +36,7 @@ project:
 climate:
   precip_lapse_rate: True
   era5:
-    path: /app/zarr_workflow/data/era5_600-1000hPa   # store made by zarr_workflow/era5_download (config_era5_2025.yml)
+    path: /app/zarr_workflow/data/era5_600-1000hPa/2025   # store made by zarr_workflow/era5_download (config_era5_2025.yml)
     product: reanalysis
     timestep: 1h
     plevels: [600,650,700,750,775,800,825,850,875,900,925,950,975,1000]   # all ERA5 levels 600-1000 hPa (checked against the store)
