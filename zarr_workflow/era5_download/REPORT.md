@@ -3,6 +3,34 @@
 Night of 2026-10-26/27. The full chronological record, with every number, error and fix, is `LOG.md` in this folder.
 **Nothing beyond the tests was downloaded.** The full 2025 download waits for your go (as the brief asked).
 
+## 0. Update 2026-10-27 (afternoon): final setup = NCAR for everything, 600-1000 hPa; 2020 tested end to end
+
+Decisions taken after the night report (sections 1-6 below are the original 37-level night report, kept as written):
+- **Levels: the 14 ERA5 levels 600-1000 hPa** (not 37): bit-identical downscaling to 37 levels for January 2025
+  (600 hPa is >= 4,090 m, the highest cluster is at 2,554 m). Tool renamed `era5_37.py` -> `era5_download.py`.
+- **Source: NCAR THREDDS for pressure AND single levels** (`source.plev: ncar`, `source.surf: ncar`). NCAR has all 7
+  single-level variables (2t, 2d, sp from `e5.oper.an.sfc`; ssrd, strd, lsp+cp=tp from `e5.oper.fc.sfc.accumu` via
+  OPeNDAP; z from `e5.oper.invariant`), equal to the CDS within GRIB packing (LOG.md). No CDS account or queue needed.
+
+**2020 full workflow test** (`scripts/run_full_year.sh 2020`, 2026-10-27 11:48-15:30 local):
+
+| step | time | result |
+|---|---|---|
+| ERA5 download, NCAR only (2,280 units, 16 workers) | 192.8 min | 0 failed; 76 transient errors all fixed by retries |
+| status + verify | 4 s | all 12 months OK: every hour (8,784), 14 levels, no NaN |
+| run_year.py (TopoSUB/TopoSCALE, 500 clusters, month by month) | 29.5 min | **YEAR COMPLETE, ALL CHECKS PASSED** |
+
+Outputs in `zarr_workflow/data/runs/2020_era5_600-1000hPa/outputs/`:
+- `downscaled/down.zarr` (403 MB): hourly, 500 clusters x 8,784 h, 13 variables, no NaN.
+- `downscaled/daily.zarr` (27 MB): 500 x 366 days, 18 daily statistics.
+- `geotiff/`: 36 COGs `t_{mean,min,max}_daily_2020-MM.tif` (25 m, EPSG:32634, one band per day; 19 GB in total),
+  each checked against the Zarr (max |diff| 4.8e-7 degC).
+- SW: 46 hourly values > 1,400 W/m2 (max 2,026), at 14 clusters, 15-17 UTC only: the known TopoSCALE sunset spike,
+  reported by the QA and not changed (as in the EDH runs).
+
+Speed: NCAR was busy all day (single request ~100 s instead of 20-45 s at night): ~3.2 h per year download. A
+night run should be ~2-2.5 h. Plus ~30 min downscaling per year.
+
 ## 1. Recommendation
 
 **Pressure levels from NCAR's THREDDS server, single levels from the CDS.**

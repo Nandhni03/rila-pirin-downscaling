@@ -357,3 +357,84 @@ Access tests:
 => A NCAR-only setup (no CDS at all) is possible: per year ~36 NCSS (an.sfc) + ~96 OPeNDAP (accumu) requests,
    each a few seconds. Not implemented in era5_download.py yet: needs stacking of the forecast axis, the first
    hours of each month from the previous month's file, tp = lsp + cp, and z from the invariant file.
+
+# 2026-10-27 (late morning): NCAR for everything; 2020 full-workflow test
+
+## User decision
+"We stick with NCAR forward." Test the whole workflow for **2020** (downscaled results as Zarr and GeoTIFF).
+
+## NCAR single levels in era5_download.py (`source.surf: ncar`)
+- Units: 1 per variable per month (84 for a year). Read with **OPeNDAP** (server-side box subset):
+  t2m/d2m/sp from the monthly analysis files; ssrd/strd/tp from the forecast files (3 per month: the previous month's
+  last file reaches 00-06 UTC of day 1), stacked to valid hours; tp = lsp + cp; z_surf from the invariant file,
+  repeated over the hours. Each unit is written as a small NetCDF to raw/, then the usual convert/check/write/read-back.
+- netCDF4/HDF5 is not thread-safe: all NetCDF reads/writes in the tool go through one lock (`_DAP_LOCK`); SURF units
+  get their own 1-thread pool, PLEV keeps its 16, so they run side by side.
+- Data dirs per year: `data/era5_600-1000hPa/2025/` (moved, configs updated) and `.../2020/`.
+
+### Debug: NCAR SURF test hung after 1-2 variables
+- First test run: d2m written, then nothing for 17 min. I wrongly concluded the process had died (there is no `ps` in
+  the container) and started a second run on the same test store: it wrote sp, then hung as well. On the host
+  (`ps`, /proc) both were alive, sleeping. Both killed, test store deleted.
+- The same reads work in the main thread (ssrd month 41.6 s) and in a worker thread (30.7 s), so not a thread issue as such.
+- Cause: the converters opened NetCDF files without closing them; the garbage collector closes them later from
+  whatever thread runs, possibly a download thread that is already inside xarray's netCDF lock -> self-deadlock.
+- Fix: every NetCDF opened by the tool is closed explicitly (`with xr.open_dataset(...) as f`).
+- Rerun: **7/7 SURF variables of January 2025 in 2.4 min.**
+
+### NCAR vs CDS single levels, January 2025 (744 h x 110 points)
+| var | max abs diff | share bit-identical |
+|---|---:|---:|
+| z_surf | 0 | 100 % |
+| ssrd | 0 | 100 % |
+| strd | 0.75 J/m2 (of 1.3e6) | 99.6 % |
+| t2m / d2m | 0.00024 K | 18-20 % |
+| sp | 0.06 Pa | 11 % |
+| tp | 1.4e-6 m | 90 % |
+=> Same data (float/GRIB-packing rounding). **NCAR alone can supply everything TopoPyScale needs.**
+
+## CDS March 14-level timing test
+Submitted 09:02 local... first job "running" since 09:02:56 and still not finished at 11:37 (> 2.5 h for 31,248 items;
+the CDS is slow today). I tried to stop it (it also blocks CDS spot checks, one job per user) but the kill/delete was
+refused by the session's permission rules -> left running; **the user decides**. 2020 `verify` therefore runs without
+CDS spot checks (NCAR = CDS was shown above for all 13 variables).
+
+## 2020 full workflow started 11:38 local
+- Configs: `era5_download/config_era5_2020.yml` (plev ncar, surf ncar, 2020, store `data/era5_600-1000hPa/2020/`),
+  `config/config_2020_era5_600-1000hPa.yml` (run dir `data/runs/2020_era5_600-1000hPa`; caches ds_param,
+  df_centroids, da_horizon copied = same 500 clusters; ds_solar NOT copied: computed for 2020).
+- Runner `scripts/run_full_year.sh 2020`: download (+1 retry pass) -> status -> verify -> run_year.py.
+- 2,280 units (2,196 PLEV day-files + 84 SURF var-months), store 8,784 h (leap year).
+- Log: `data/runs/2020_era5_600-1000hPa/logs/full_year_2020.out` (+ download log under `data/era5_600-1000hPa/2020/logs/`).
+
+### 2020 run, debug: slow start (11:38-11:48 local)
+- First 6 min: only 12 units written, 5 retries after `TimeoutError` (180 s). A single NCSS request took 97 s
+  (20-45 s yesterday night): NCAR is slower now. -> timeout raised to **600 s** (configs 2020 and 2025).
+- Restart (by PID; note: `pkill -f "run_full_year.sh 2020"` also matched and killed my own shell command).
+- Real bottleneck found after the restart: each PLEV unit took **17-20 s to write** (0.1 s in the Feb test). The SURF
+  thread holds `_DAP_LOCK` during its OPeNDAP reads (10-40 s); the main thread took the same lock to read each raw
+  file -> every write waited for a SURF read; 82 finished raw files queued up.
+- Fix: NCSS raw files are NetCDF-3 classic (`CDF\x01`) -> read with xarray's `scipy` engine (no netCDF4 library, no
+  lock); SURF raw files are now written as NetCDF-3 with scipy too. `_DAP_LOCK` guards only the OPeNDAP reads.
+  The 8 SURF raw files written in NetCDF-4 by the old code were deleted (re-downloaded).
+- After the fix (restart 11:48 local): **102 units written in 3.5 min, writes 0.0 s, 0 retries**.
+
+### 2020 ERA5 download: result (finished 15:01 local)
+- `run finished in 192.8 min: 2255 written, 0 failed` (+25 units from the first two attempts = 2,280). Average
+  ~11.7 units/min with 16 NCSS workers + 1 OPeNDAP thread; NCAR was slow all day (busy period).
+- 76 first attempts failed and **all** succeeded on retry: 52 read timeouts (600 s), 11 HTTP 504, 3 HTTP 502,
+  5 URLError, 2 HTTP 404 (transient! same URL OK 60 s later), 3 OPeNDAP `NetCDF: I/O failure` (SURF). -> retries
+  with backoff are required, not optional; a 404 from THREDDS must not be treated as permanent.
+- Every month validated as written (all hours, 14 levels, no NaN-only slices); `status` 2,280/2,280; `verify` OK for
+  all 12 months (744/696/744/720/744/720/744/744/720/744/720/744 h). No CDS spot checks (CDS slot still taken by the
+  March test; NCAR = CDS shown above for all 13 variables).
+- Store `data/era5_600-1000hPa/2020/ERA5.zarr`: 182 MB, 8,784 h x 14 levels x 10 x 11; raw folder empty (all deleted
+  after verified writes).
+
+### 2020 downscaling (run_year.py, 15:01-15:30 local)
+- 12 months x 127-144 s, total 1,767 s; `YEAR COMPLETE, ALL CHECKS PASSED`; summary `outputs/year_summary.json`.
+- `down.zarr` 500 x 8,784 h, 13 vars, 0 NaN; `daily.zarr` 500 x 366; 36 GeoTIFFs (COG, 4797 x 5079, 25 m, EPSG:32634,
+  ~530 MB each, 19 GB total), all checked against the Zarr.
+- QA t range per month from -16.4 degC (Jan/Feb) to 35.7 degC (Jul). SW > 1,400 W/m2: 46 values (max 2,026 W/m2), 14
+  clusters, only 15-17 UTC = the known TopoSCALE sunset spike (reported, not a failure, see workflow.qa_hourly).
+- Harmless at exit: loky "leaked semaphore objects" warning (joblib workers, after the run finished).

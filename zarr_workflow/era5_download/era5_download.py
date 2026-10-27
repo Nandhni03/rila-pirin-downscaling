@@ -491,8 +491,7 @@ def download_ncar_surf(cfg, unit, client=None):
         try:
             da = ncar_surf_month(cfg, v, y, m)
             part = out.with_name(out.name + '.part')
-            with _DAP_LOCK:
-                da.to_dataset().to_netcdf(part, engine='netcdf4')
+            da.to_dataset().to_netcdf(part, engine='scipy', format='NETCDF3_64BIT')   # scipy: no netCDF4 lock
             os.replace(part, out)
             stats.update(attempts=attempt + 1, total_s=round(time.time() - t0, 1), bytes=out.stat().st_size)
             return out, stats
@@ -507,8 +506,12 @@ def download_ncar_surf(cfg, unit, client=None):
 
 
 def convert_ncar_surf(path, unit, cfg):
-    with _DAP_LOCK:
-        ds = xr.open_dataset(path).load()
+    # raw files are NetCDF-3 and read with scipy, so the main thread never waits for _DAP_LOCK (held by the SURF
+    # thread during its OPeNDAP reads; with netCDF4 here every PLEV write waited 17-20 s, seen 2026-10-27).
+    # Files are closed explicitly: a file left to the garbage collector can be closed from a thread inside
+    # xarray's netCDF lock, which then deadlocks (seen 2026-10-27).
+    with xr.open_dataset(path, engine='scipy') as f:
+        ds = f.load()
     return _std_grid(ds, cfg)[unit['vars']].astype('float32')
 
 
@@ -573,8 +576,8 @@ def convert_cds_surf(path, unit, cfg):
 
 def convert_ncar(path, unit, cfg):
     name = PLEV[unit['vars'][0]][1][2]
-    with _DAP_LOCK:
-        ds = xr.open_dataset(path)[[name]].load().rename({name: unit['vars'][0]})
+    with xr.open_dataset(path, engine='scipy') as f:     # NCSS returns NetCDF-3: scipy, no lock (see convert_ncar_surf)
+        ds = f[[name]].load().rename({name: unit['vars'][0]})
     ds = _std_grid(ds, cfg)
     ds = ds.sel(level=cfg['levels'])          # NCSS returns all 37 levels; keep the configured ones
     return ds.astype('float32').load()
