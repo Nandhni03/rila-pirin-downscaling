@@ -286,3 +286,16 @@ Findings:
 - In progress: 1992 (A, 1835/2191), 1993 (B, 1621), 1994 (C, 749). 25 more years queued -> ~8-9 years per lane x
   ~6.1 h -> **NCAR series complete ~Mon 2026-11-09 afternoon UTC** if NCAR holds this speed.
 - Memory: 11 GB used (only one series downscaling now).
+
+## 2026-11-09 16:34 UTC: both series complete
+- **NCAR series (final dataset): 41/41** (last: 2024 at 16:34 UTC). **EDH series: 41/41** (since 11-06 ~20:25 UTC).
+  No RETRIED / FAILED / ERA5_FAILED in either series; every NCAR year has ERA5_OK (verify: no missing hours/NaN).
+- Corrupt raw NCAR downloads caught by the `raw_bad/` fix (11-06) and re-downloaded automatically: 15 files in
+  14 years (1992, 1993, 1994, 1997 x2, 2000, 2002, 2004, 2006, 2008, 2011, 2012, 2015, 2016, 2023); at most two per
+  year, all on different days/variables -> isolated transfer errors, not a systematic problem.
+- NCAR throughput with 3 queue lanes stayed ~6 h per year per lane until the end (2013-2024 in ~44 h).
+- Yearly monthly-mean temperature range (QA, 30 m GeoTIFF): min -13.5 (2003) .. -5.2 degC (2014), max 24.4 (1991)
+  .. 29.9 degC (2024); NCAR vs EDH ranges agree within 0.3 K for every year.
+- Disk: `data/runs` 42 GB, `data/runs_edh` 42 GB, `data/era5_600-1000hPa` 7.3 GB.
+- Queue lanes A/B/C ended by themselves (queue empty). Still running: `update_results.py --every 600` (harmless;
+  stop it or leave it, results/ is final). Host watchdog stopped.
