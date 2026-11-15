@@ -1,0 +1,473 @@
+start 2026-11-10 12:09:56; branch fix/aspect-azimuth-convention 21d9f32
+TopoPyScale imported from /home/andreiionita27/SurfexCrocus/aspect_fix/TopoPyScale_fix/TopoPyScale/__init__.py
+Run started 2026-11-10 12:09:58; config /home/andreiionita27/SurfexCrocus/aspect_fix/config/config_meridionali_Efix_2025-01_2025-08.yml
+
+---> DEM file found
+{'latN': 46.0508428738739, 'latS': 44.711963135777545, 'lonW': 22.11225376243332, 'lonE': 25.7348311005784}
+Project lat/lon extent:
+
+	------------------------------
+	|        North:46.1          |
+	|West:22.1          East:25.7|
+	|        South:44.7          |
+	------------------------------
+---> Config loaded
+era5 download no longer automatically done in class decalaration - please declare <mp.get_era5()> in run.py file.
+
+========== compute_dem_param ==========
+
+---> Dataset ds_param.nc found.
+
+---> Extracting DEM parameters (slope, aspect, svf)
+---> File /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/meridionali_Efix_2025-01_2025-08/outputs/tmp/ds_param.nc saved
+========== compute_dem_param done in 159.2 s
+
+========== extract_topo_param ==========
+---> Centroids file df_centroids.pck exists and loaded
+========== extract_topo_param done in 0.0 s
+
+========== compute_solar_geometry ==========
+
+---> Computing solar geometry
+---> File /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/meridionali_Efix_2025-01_2025-08/outputs/ds_solar.nc saved
+========== compute_solar_geometry done in 161.3 s
+
+========== compute_horizon (load + sample at centroids) ==========
+---> Horizon file da_horizon.nc exists and loaded
+---> Centroids file df_centroids.pck updated with horizons
+========== compute_horizon (load + sample at centroids) done in 32.5 s
+
+========== get_era5 ==========
+---> ERA5 store /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/era5_600-1000hPa/2025/ERA5.zarr: complete for 2025-01-01 .. 2025-08-31, 14 levels 600-1000 hPa, 13 variables, no NaN
+========== get_era5 done in 0.3 s
+
+========== downscale_climate ==========
+---> Output store down.zarr created (3001 points x 5832 timesteps)
+---> 3001 points to downscale on 14 cores (0 already done), 5832 timesteps
+---> WARNING: Point 0013 is -21.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0006 is -25.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0009 is -177.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0002 is -73.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0015 is -78.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0018 is -105.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0023 is -91.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0027 is -109.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0028 is -74.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0029 is -84.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0036 is -71.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0041 is -171.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0051 is -124.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0049 is -169.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0054 is -9.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0056 is -41.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0070 is -57.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0062 is -115.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0066 is -149.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0075 is -37.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0081 is -152.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0080 is -96.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0084 is -92.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0086 is -48.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0097 is -177.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0093 is -70.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0098 is -75.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0099 is -117.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0107 is -28.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0110 is -46.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0109 is -141.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0105 is -13.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0112 is -151.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0126 is -36.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0120 is -100.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0124 is -26.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0132 is -2.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0138 is -94.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0141 is -49.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0142 is -96.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> 150/3001 points, 64s elapsed, ETA 1224s
+---> WARNING: Point 0156 is -128.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0163 is -49.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0167 is -48.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0162 is -149.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0171 is -193.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0173 is -0.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0179 is -17.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0183 is -127.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0184 is -112.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0188 is -43.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0187 is -119.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0195 is -122.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0206 is -136.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0211 is -126.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0200 is -71.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0213 is -124.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0217 is -124.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0215 is -52.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0221 is -115.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0216 is -61.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0223 is -185.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0220 is -91.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0234 is -99.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0228 is -9.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0238 is -27.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0237 is -83.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0241 is -63.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0252 is -139.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0243 is -60.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0251 is -59.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0261 is -166.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0264 is -12.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0267 is -77.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0272 is -98.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0275 is -117.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0282 is -86.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0283 is -63.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0295 is -15.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0300 is -53.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0299 is -72.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> 300/3001 points, 103s elapsed, ETA 932s
+---> WARNING: Point 0302 is -104.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0309 is -74.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0307 is -85.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0313 is -35.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0321 is -75.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0319 is -34.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0323 is -119.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0314 is -63.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0318 is -164.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0327 is -61.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0331 is -142.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0330 is -42.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0340 is -126.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0344 is -244.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0353 is -72.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0356 is -57.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0360 is -17.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0365 is -127.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0370 is -127.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0376 is -168.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0379 is -38.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0383 is -41.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0384 is -25.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0392 is -150.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0394 is -4.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0393 is -57.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0399 is -228.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0402 is -39.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0404 is -64.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0407 is -5.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0409 is -4.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0412 is -18.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0415 is -166.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0418 is -57.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0421 is -53.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0423 is -144.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0426 is -13.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0442 is -84.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0441 is -168.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0447 is -161.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0446 is -52.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0448 is -172.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> 450/3001 points, 139s elapsed, ETA 786s
+---> WARNING: Point 0455 is -20.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0462 is -96.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0469 is -88.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0480 is -164.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0489 is -53.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0483 is -142.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0493 is -40.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0495 is -124.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0497 is -1.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0509 is -21.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0510 is -16.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0522 is -187.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0513 is -56.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0525 is -131.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0532 is -90.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0530 is -28.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0528 is -1.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0537 is -33.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0543 is -21.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0557 is -39.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0566 is -57.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0560 is -47.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0562 is -8.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0568 is -59.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0586 is -91.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0590 is -118.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0593 is -44.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0608 is -7.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0604 is -120.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> 600/3001 points, 177s elapsed, ETA 708s
+---> WARNING: Point 0609 is -50.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0610 is -22.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0612 is -91.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0614 is -122.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0623 is -94.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0617 is -69.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0622 is -99.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0625 is -9.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0632 is -3.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0635 is -28.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0639 is -76.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0637 is -105.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0640 is -104.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0656 is -78.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0676 is -42.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0671 is -14.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0695 is -56.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0701 is -155.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0702 is -142.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0710 is -131.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0717 is -111.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0715 is -60.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0713 is -132.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0725 is -116.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0727 is -63.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0733 is -77.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0731 is -68.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0732 is -109.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0738 is -45.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0730 is -110.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0739 is -16.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0740 is -181.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0741 is -178.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0744 is -39.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0745 is -32.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> WARNING: Point 0747 is -21.0 m lower than the 1000.0 hPa geopotential
+=> Values sampled from Psurf and lowest Plevel. No vertical interpolation
+---> 750/3001 points, 213s elapsed, ETA 640s
+---> 900/3001 points, 250s elapsed, ETA 583s
+---> 1050/3001 points, 285s elapsed, ETA 530s
+---> 1200/3001 points, 322s elapsed, ETA 483s
+---> 1350/3001 points, 360s elapsed, ETA 441s
+---> 1500/3001 points, 396s elapsed, ETA 396s
+---> 1650/3001 points, 435s elapsed, ETA 356s
+---> 1800/3001 points, 476s elapsed, ETA 318s
+---> 1950/3001 points, 512s elapsed, ETA 276s
+---> 2100/3001 points, 551s elapsed, ETA 236s
+---> 2250/3001 points, 587s elapsed, ETA 196s
+---> 2400/3001 points, 626s elapsed, ETA 157s
+---> 2550/3001 points, 663s elapsed, ETA 117s
+---> 2700/3001 points, 701s elapsed, ETA 78s
+---> 2850/3001 points, 737s elapsed, ETA 39s
+---> 3000/3001 points, 773s elapsed, ETA 0s
+---> 3001/3001 points, 773s elapsed, ETA 0s
+---> Downscaling: 3001 points done this run (0 earlier), 0 failed, 773s wall, 3.5s per point per worker
+---> 187 point(s) lie below the lowest pressure level at some hour and use the no-vertical-interpolation fallback: ['0002', '0006', '0009', '0013', '0015', '0018', '0023', '0027', '0028', '0029', '0036', '0041', '0049', '0051', '0054', '0056', '0062', '0066', '0070', '0075', '0080', '0081', '0084', '0086', '0093', '0097', '0098', '0099', '0105', '0107', '0109', '0110', '0112', '0120', '0124', '0126', '0132', '0138', '0141', '0142', '0156', '0162', '0163', '0167', '0171', '0173', '0179', '0183', '0184', '0187', '0188', '0195', '0200', '0206', '0211', '0213', '0215', '0216', '0217', '0220', '0221', '0223', '0228', '0234', '0237', '0238', '0241', '0243', '0251', '0252', '0261', '0264', '0267', '0272', '0275', '0282', '0283', '0295', '0299', '0300', '0302', '0307', '0309', '0313', '0314', '0318', '0319', '0321', '0323', '0327', '0330', '0331', '0340', '0344', '0353', '0356', '0360', '0365', '0370', '0376', '0379', '0383', '0384', '0392', '0393', '0394', '0399', '0402', '0404', '0407', '0409', '0412', '0415', '0418', '0421', '0423', '0426', '0441', '0442', '0446', '0447', '0448', '0455', '0462', '0469', '0480', '0483', '0489', '0493', '0495', '0497', '0509', '0510', '0513', '0522', '0525', '0528', '0530', '0532', '0537', '0543', '0557', '0560', '0562', '0566', '0568', '0586', '0590', '0593', '0604', '0608', '0609', '0610', '0612', '0614', '0617', '0622', '0623', '0625', '0632', '0635', '0637', '0639', '0640', '0656', '0671', '0676', '0695', '0701', '0702', '0710', '0713', '0715', '0717', '0725', '0727', '0730', '0731', '0732', '0733', '0738', '0739', '0740', '0741', '0744', '0745', '0747']
+========== downscale_climate done in 773.8 s
+
+
+STOPPED AFTER DOWNSCALE (as requested)
+	Command being timed: "../venv/bin/python meridionali_zarr/scripts/run_year_public.py /home/andreiionita27/SurfexCrocus/aspect_fix/config/config_meridionali_Efix_2025-01_2025-08.yml --stop-after downscale"
+	User time (seconds): 315.17
+	System time (seconds): 199.58
+	Percent of CPU this job got: 44%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 19:25.01
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 11116520
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 66060
+	Minor (reclaiming a frame) page faults: 9871797
+	Voluntary context switches: 17842109
+	Involuntary context switches: 9409
+	Swaps: 0
+	File system inputs: 26101256
+	File system outputs: 12057488
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+exit 0 end 2026-11-10 12:29:21
+/home/andreiionita27/miniconda3/lib/python3.13/multiprocessing/resource_tracker.py:277: UserWarning: resource_tracker: There appear to be 14 leaked semaphore objects to clean up at shutdown: {'/loky-2863564-h_p9efjv', '/loky-2863500-bk5xtex8', '/loky-2863576-b9o467b1', '/loky-2863423-c527wcf_', '/loky-2863408-_9c_eafk', '/loky-2863895-fel1x5rb', '/loky-2863571-2_ygqum9', '/loky-2863522-yh81pcgv', '/loky-2863403-bmxayurm', '/loky-2863475-o1hbgqah', '/loky-2863419-3o07r3wo', '/loky-2863589-b8xv27ga', '/loky-2864362-ohfs72dt', '/loky-2863451-03xnuiyv'}
+  warnings.warn(

@@ -1,0 +1,155 @@
+=== 2026-11-11 10:42:25 START 1 export forcing (fix branch)
+Export config_meridionali_Efix2_2024-09_2024-12.yml + config_meridionali_Efix2_2025-01_2025-08.yml -> /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/surfex_Efix/FORCING*.nc, 2024-09-01 .. 2025-08-31
+---> File /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/surfex_Efix/FORCING_2024090100_2025083123.nc saved
+to_surfex done in 407 s
+OK   FORCING_2024090100_2025083123.nc: 3001 points x 8760 h (2024-09-01 00:00:00 .. 2025-08-31 23:00:00), 2.73 GB; Tair -19.6..37.5 degC, snowfall share 21.6%, ZS 88..2468 m
+ALL SURFEX FILES OK
+=== 2026-11-11 10:49:26 exit 0
+=== 2026-11-11 10:49:26 START 2 crocus all points 6-hourly
+3001 points, 8760 h (2024090100 .. 2025083123) -> 12 chunks, 12 at a time -> /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/crocus_Efix/2024-2025
+10:49:55 chunk forcing files written
+10:51:43 chunk 00: OK (exit 0, 1.8 min); 1 of 12 done
+10:51:43 chunk 01: OK (exit 0, 1.8 min); 2 of 12 done
+10:51:43 chunk 02: OK (exit 0, 1.8 min); 3 of 12 done
+10:52:00 chunk 03: OK (exit 0, 2.1 min); 4 of 12 done
+10:52:00 chunk 04: OK (exit 0, 2.1 min); 5 of 12 done
+10:52:00 chunk 05: OK (exit 0, 2.1 min); 6 of 12 done
+10:52:00 chunk 06: OK (exit 0, 2.1 min); 7 of 12 done
+10:52:15 chunk 07: OK (exit 0, 2.3 min); 8 of 12 done
+10:52:15 chunk 08: OK (exit 0, 2.3 min); 9 of 12 done
+10:52:15 chunk 09: OK (exit 0, 2.3 min); 10 of 12 done
+10:52:31 chunk 10: OK (exit 0, 2.6 min); 11 of 12 done
+10:52:31 chunk 11: OK (exit 0, 2.6 min); 12 of 12 done
+10:52:31 finished in 2.6 min: 12 of 12 chunks OK
+=== 2026-11-11 10:52:32 exit 0
+=== 2026-11-11 10:52:32 START 3 crocus all points hourly reduced
+3001 points, 8760 h (2024090100 .. 2025083123) -> 12 chunks, 12 at a time -> /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/crocus_Efix/2024-2025_hourly_reduced
+10:53:02 chunk forcing files written
+10:55:06 chunk 00: OK (exit 0, 2.1 min); 1 of 12 done
+10:55:06 chunk 01: OK (exit 0, 2.1 min); 2 of 12 done
+10:55:06 chunk 02: OK (exit 0, 2.1 min); 3 of 12 done
+10:55:23 chunk 03: OK (exit 0, 2.3 min); 4 of 12 done
+10:55:23 chunk 04: OK (exit 0, 2.3 min); 5 of 12 done
+10:55:23 chunk 05: OK (exit 0, 2.3 min); 6 of 12 done
+10:55:23 chunk 06: OK (exit 0, 2.3 min); 7 of 12 done
+10:55:23 chunk 07: OK (exit 0, 2.3 min); 8 of 12 done
+10:55:38 chunk 08: OK (exit 0, 2.6 min); 9 of 12 done
+10:55:38 chunk 09: OK (exit 0, 2.6 min); 10 of 12 done
+10:55:54 chunk 10: OK (exit 0, 2.9 min); 11 of 12 done
+10:55:54 chunk 11: OK (exit 0, 2.9 min); 12 of 12 done
+10:55:54 finished in 2.9 min: 12 of 12 chunks OK
+=== 2026-11-11 10:55:54 exit 0
+=== 2026-11-11 10:55:54 START 4 subset hourly profiles
+ point_in_subset  point elev_class aspect_class  elevation  slope_deg  bearing  bearing_used_old
+               0    244      <1000            N      774.6       17.3     16.4              16.4
+               1    862      <1000            N      824.5       20.7     16.6              16.6
+               2    752      <1000            N      824.7       20.4      0.2               0.2
+               3    429      <1000            S      778.1       16.7    136.7             133.6
+               4    907      <1000            S      821.4       17.1    219.0             219.0
+               5   1411      <1000            S      822.2       18.5    167.3              81.5
+               6   1593  1000-1500            N     1244.3       29.8     19.0              19.0
+               7   1741  1000-1500            N     1244.8       26.1    324.6             324.6
+               8    834  1000-1500            N     1256.7       16.4     19.4              19.5
+               9   1811  1000-1500            S     1246.4       31.9    144.7             144.3
+              10   1264  1000-1500            S     1248.0       14.0    183.2             334.6
+              11   1733  1000-1500            S     1253.2       18.8    211.5             216.3
+              12   2106  1500-2000            N     1746.5       20.0    354.1             354.2
+              13   2141  1500-2000            N     1748.3       23.6     11.2              11.2
+              14   2316  1500-2000            N     1751.7       22.3    342.9             342.9
+              15   2068  1500-2000            S     1749.1       11.4    195.1             298.6
+              16   2202  1500-2000            S     1749.4       17.5    150.5             110.9
+              17   2130  1500-2000            S     1753.7       10.0    138.9             138.6
+              18   2526      >2000            N     2189.2       23.1     17.0              17.1
+              19   2537      >2000            N     2205.2       24.8     27.1              27.0
+              20   2704      >2000            N     2208.9       15.1    327.7             327.7
+              21   2599      >2000            S     2195.7       35.0    222.3             223.3
+              22   2664      >2000            S     2200.4       21.5    161.4              92.4
+              23   2528      >2000            S     2202.2       33.4    143.4             130.5
+fix: exit 0, OK, 34 s -> [PosixPath('/home/andreiionita27/SurfexCrocus/hy2024-2025_fix/subset_hourly/output/pro/PRO_2024090100_2025083123.nc')]
+=== 2026-11-11 10:56:33 exit 0
+=== 2026-11-11 10:56:33 START 5a analysis fix
+[fix] reading all-points PRO (6-hourly) ...
+  chunk_00: 251 points
+  chunk_01: 250 points
+  chunk_02: 250 points
+  chunk_03: 250 points
+  chunk_04: 250 points
+  chunk_05: 250 points
+  chunk_06: 250 points
+  chunk_07: 250 points
+  chunk_08: 250 points
+  chunk_09: 250 points
+  chunk_10: 250 points
+  chunk_11: 250 points
+[fix] reading all-points PRO (hourly, reduced) ...
+  hourly chunk_00: 251 points
+  hourly chunk_01: 250 points
+  hourly chunk_02: 250 points
+  hourly chunk_03: 250 points
+  hourly chunk_04: 250 points
+  hourly chunk_05: 250 points
+  hourly chunk_06: 250 points
+  hourly chunk_07: 250 points
+  hourly chunk_08: 250 points
+  hourly chunk_09: 250 points
+  hourly chunk_10: 250 points
+  hourly chunk_11: 250 points
+/home/andreiionita27/SurfexCrocus/scripts/crocus_hy_analysis.py:354: UserWarning: obj.round has no effect with datetime, timedelta, or period dtypes. Use obj.dt.round(...) instead.
+  ind.round(4).to_csv(OUT / 'indicators_per_point.csv', index=False)
+variant: fix; forcing /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/surfex_Efix/FORCING_2024090100_2025083123.nc
+points: 3001, days: 335 (2024-10-01 .. 2025-08-31)
+NaN in daily HS/SWE/hourly-LWC: 0/0/0
+flat clusters (slope < 5 deg): 194; non-flat clusters illuminated in another sector by the old downscaling: 526
+aspect classes: aspect_class      E      N      S      W   flat | elev_class                                      | <1000         263.0  222.0  252.0  257.0  193.0 | 1000-1500     182.0  163.0  161.0  181.0    1.0 | 1500-2000     154.0  125.0  128.0  156.0    NaN | >2000         148.0  130.0  141.0  144.0    NaN
+>2000 m: 563 points; SCD min 145, peak SWE min 228 mm; no persistent snow: 0; SCD < 120 d: 0
+snow left on 31 Aug 2025 (HS > 0.05 m): 0 points, elevations []
+peak SWE: max 1019 mm (cluster 2575, 2463 m); > 1000 mm: 1
+HS max: 2.57 m; > 3 m: 0
+density at peak SWE (HS>0.01): 96..509 kg m-3, median 270; < 100: 2, > 500: 1
+<1000 m: no persistent snow at 487 of 1187 points
+solid fraction: 0.01..0.58; annual precipitation (Oct-Aug) 456..2075 mm
+TG1 (soil 0.5 cm) daily mean range: -6.9..35.9 degC
+subset (full hourly) vs all-points runs, |diff| SCD: median 0.00, max 5.00
+subset (full hourly) vs all-points runs, |diff| peak_SWE_mm: median 0.04, max 0.79
+subset (full hourly) vs all-points runs, |diff| wet_snow_days_hourly: median 0.00, max 2.00
+subset (full hourly) vs all-points runs, |diff| ROS_events: median 0.00, max 0.00
+subset (full hourly) vs all-points runs, |diff| density_at_peak: median 0.41, max 13.44
+subset (full hourly) vs 6-hourly, |diff| snow_onset (days): median 0.0, max 16
+subset (full hourly) vs 6-hourly, |diff| peak_SWE_date (days): median 0.0, max 1
+subset (full hourly) vs 6-hourly, |diff| melt_onset (days): median 0.0, max 1
+subset (full hourly) vs 6-hourly, |diff| melt_out (days): median 0.0, max 1
+profile points (subset index): [13, 19, 22]
+elev_class aspect  n_points snow_onset_median  peak_SWE_mm_median peak_SWE_date_median melt_out_median  SCD_median  wet_snow_days_hourly_median  density_at_peak_median  days_HS_gt_0.8_before_31Jan_median  SW_DJF_Wm2_median
+     <1000      N       222        2025-02-16              15.674           2025-02-21      2025-03-01        11.5                          6.5                 184.491                                 0.0             46.134
+     <1000      S       252        2025-02-17               9.731           2025-01-06      2025-02-26         0.0                          4.0                 165.152                                 0.0             84.694
+     <1000    all      1187        2025-02-17              11.511           2025-02-21      2025-02-27         7.0                          5.0                 158.645                                 0.0             68.687
+ 1000-1500      N       163        2024-11-21              88.736           2025-03-04      2025-03-13       112.0                         76.0                 288.789                                 0.0             40.050
+ 1000-1500      S       161        2024-12-06              43.426           2024-12-28      2025-02-27        47.0                         44.0                 262.938                                 0.0             87.737
+ 1000-1500    all       688        2024-11-22              58.444           2025-01-06      2025-03-11        87.0                         66.0                 275.583                                 0.0             60.448
+ 1500-2000      N       125        2024-11-12             233.469           2025-03-03      2025-04-15       143.0                         98.0                 289.830                                 0.0             40.986
+ 1500-2000      S       128        2024-11-12             151.562           2025-03-03      2025-03-25       124.0                        105.0                 296.363                                 0.0             85.704
+ 1500-2000    all       563        2024-11-12             194.060           2025-03-03      2025-04-15       135.0                        105.0                 287.914                                 0.0             59.822
+     >2000      N       130        2024-11-11             433.641           2025-04-14      2025-05-22       185.5                         86.5                 359.744                                55.0             34.497
+     >2000      S       141        2024-11-11             368.115           2025-04-12      2025-04-26       166.0                        131.0                 345.070                                49.0             86.534
+     >2000    all       563        2024-11-11             409.993           2025-04-14      2025-05-21       175.0                        103.0                 354.028                                52.0             58.357
+=== 2026-11-11 10:57:25 exit 0
+=== 2026-11-11 10:57:25 START 5b compare old vs new
+elev_class aspect  n_points  SW_DJF_Wm2_old  SW_DJF_Wm2_new  SW_DJF_Wm2_change_median  peak_SWE_mm_old  peak_SWE_mm_new  peak_SWE_mm_change_median  SCD_old  SCD_new  SCD_change_median melt_out_old melt_out_new  melt_out_change_days_median  wet_snow_days_hourly_old  wet_snow_days_hourly_new  wet_snow_days_hourly_change_median  n_old_sector_differs
+     <1000      N       222            44.5            46.1                       1.5             16.0             15.7                       -0.2     12.0     11.5                0.0   2025-03-01   2025-03-01                          0.0                       6.0                       6.5                                 0.0                     0
+     <1000      E       263            59.1            65.9                       5.9             14.6             13.4                       -0.6     10.0      9.0               -1.0   2025-02-28   2025-02-28                         -1.0                       8.0                       7.0                                 0.0                     2
+     <1000      S       252            66.5            84.7                      11.0             12.7              9.7                       -0.9      8.0      0.0                0.0   2025-02-27   2025-02-26                         -1.0                       6.0                       4.0                                 0.0                   187
+     <1000      W       257            71.8            67.7                      -4.3             11.1             11.8                        0.1      7.0      8.0                0.0   2025-02-27   2025-02-27                          1.0                       6.0                       6.0                                 0.0                     0
+ 1000-1500      N       163            39.3            40.0                       1.6             93.3             88.7                       -2.8    112.0    112.0                0.0   2025-03-14   2025-03-13                          0.0                      75.0                      76.0                                 0.0                     0
+ 1000-1500      E       182            53.7            60.8                       6.2             64.0             55.8                       -6.2     99.0     85.5               -7.0   2025-03-12   2025-03-10                         -1.0                      74.5                      66.0                                -4.0                     0
+ 1000-1500      S       161            62.5            87.7                      12.5             57.9             43.4                       -7.2     82.0     47.0              -11.0   2025-03-10   2025-02-27                         -3.0                      62.0                      44.0                                -6.0                   120
+ 1000-1500      W       181            64.6            62.2                      -3.3             53.6             58.3                        1.8     80.0     88.0                2.0   2025-03-08   2025-03-10                          1.0                      64.0                      70.0                                 2.0                     0
+ 1500-2000      N       125            39.6            41.0                       1.5            236.8            233.5                       -1.7    143.0    143.0                0.0   2025-04-15   2025-04-15                          0.0                      98.0                      98.0                                 0.0                     0
+ 1500-2000      E       154            55.9            62.3                       6.6            201.2            190.1                      -10.7    136.5    134.0               -2.0   2025-04-15   2025-04-15                          0.0                     106.0                     106.5                                 0.0                     1
+ 1500-2000      S       128            56.9            85.7                      17.4            195.2            151.6                      -24.7    136.0    124.0               -7.0   2025-04-15   2025-03-25                         -1.0                     103.0                     105.0                                 1.0                   111
+ 1500-2000      W       156            62.7            61.0                      -2.9            189.9            194.0                        5.4    133.0    135.0                1.0   2025-03-28   2025-04-15                          0.0                     108.0                     108.0                                 1.0                     0
+     >2000      N       130            33.4            34.5                       1.6            442.5            433.6                       -0.9    188.0    185.5               -0.5   2025-05-23   2025-05-22                          0.0                      87.5                      86.5                                -0.5                     0
+     >2000      E       148            53.7            60.0                       6.5            412.5            402.8                       -9.3    180.0    172.5               -3.0   2025-05-22   2025-05-03                         -2.0                      92.5                     100.5                                 0.0                     0
+     >2000      S       141            61.1            86.5                      13.1            397.5            368.1                      -19.6    174.0    166.0               -3.0   2025-05-21   2025-04-26                         -2.0                     102.0                     131.0                                15.0                   105
+     >2000      W       144            63.3            57.7                      -3.7            408.5            415.1                        7.2    173.0    176.0                2.0   2025-05-04   2025-05-21                          1.0                     107.0                     101.5                                -1.0                     0
+=== 2026-11-11 10:57:26 exit 0
+ALL DONE 2026-11-11 10:57:26

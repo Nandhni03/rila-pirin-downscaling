@@ -1,0 +1,17 @@
+[PASS] df_centroids of both new runs identical, aspect_R/flat kept after compute_horizon: columns aspect_R, flat present: True
+[PASS] time axis: 8760 hourly steps, 2024-09-01 00:00:00 .. 2025-08-31 23:00:00
+[PASS] same points: 
+[FAIL] (f) non-SW variables unchanged: t max|diff| 5.3e+00; q max|diff| 1.8e-03; p max|diff| 2.4e+01; u max|diff| 5.2e+00; v max|diff| 3.9e+00; ws max|diff| 5.3e+00; wd max|diff| 6.3e+00; LW max|diff| 2.0e+01; tp max|diff| 0.0e+00
+[PASS] SW: no NaN, SW_direct <= S0 = 1370 W m-2: NaN 0; SW_direct max old 2866, new 924 W m-2; hours > 1361 old 112, new 0
+[PASS] (c) DJF SW: S > E,W > N in every class: 
+aspect_class     S     E     W     N
+elev_class                          
+<1000         84.7  65.9  67.7  46.1
+1000-1500     87.7  60.8  62.2  40.0
+1500-2000     85.7  62.3  61.0  41.0
+>2000         86.5  60.0  57.7  34.5
+[PASS] (c) DJF SW: E ~ W (|W-E| / mean < 10 %): <1000: 2.8 %, 1000-1500: 2.4 %, 1500-2000: 2.1 %, >2000: 4.0 % (old: 19.3 %, 18.4 %, 11.5 %, 16.4 %)
+[PASS] (d) June N/S difference much smaller than DJF (relative S-N): <1000: DJF 59 %, June 7 %, 1000-1500: DJF 75 %, June 8 %, 1500-2000: DJF 71 %, June 9 %, >2000: DJF 86 %, June 15 %
+[FAIL] (b) pvlib: N and S similar correlation (new):        ratio_TPS_pvlib  corr_hourly | group                               | N                4.437        0.960 | S                0.481        0.784
+[PASS] (e) horizon: no direct SW while horizon > solar elevation; correct beats mirrored:  cluster  shaded_hours  direct_while_shaded  agreement_correct  agreement_mirrored |     1872          1736                    0              0.996               0.793 |     2495          1663                    0              0.996               0.744
+[PASS] (g) aspect-inconsistent clusters (> 45 deg from the k-means centroid direction, non-flat): old (arithmetic mean) 363, new (circular) 0; flat 194; aspect_R < 0.5: 3

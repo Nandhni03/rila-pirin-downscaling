@@ -1,0 +1,22 @@
+points: 3001, days: 335 (2024-10-01 .. 2025-08-31)
+NaN in daily HS/SWE: 0/0
+aspect inconsistent (> 45 deg from circular mean): 387 points
+aspect classes: aspect_class    E   N    S    W  inconsistent | elev_class                                    | <1000         335  87  275  329           161 | 1000-1500     199  41  164  198            86 | 1500-2000     178  17  125  170            73 | >2000         168  36  130  162            67
+>2000 m: 563 points; SCD min 144, peak SWE min 221 mm; no persistent snow: 0; SCD < 120 d: 0
+snow left on 31 Aug 2025 (HS > 0.05 m): 0 points, elevations []
+peak SWE: max 1038 mm (cluster 2575, 2463 m); > 1000 mm: 1
+HS max: 2.59 m; > 3 m: 0
+density at peak SWE (HS>0.01): 95..455 kg m-3, median 272; < 100: 2, > 500: 0
+<1000 m: no persistent snow at 426 of 1187 points
+solid fraction: 0.01..0.58; annual precipitation (Oct-Aug) 456..2075 mm
+TG1 (soil 0.5 cm) daily mean range: -7.0..35.3 degC
+subset hourly vs 6-hourly, |diff| SCD: median 0.00, max 1.00
+subset hourly vs 6-hourly, |diff| peak_SWE_mm: median 0.02, max 0.79
+subset hourly vs 6-hourly, |diff| wet_snow_days: median 3.00, max 12.00
+subset hourly vs 6-hourly, |diff| ROS_events: median 0.00, max 1.00
+subset hourly vs 6-hourly, |diff| density_at_peak: median 0.47, max 9.49
+subset hourly vs 6-hourly, |diff| snow_onset (days): median 0.0, max 1
+subset hourly vs 6-hourly, |diff| peak_SWE_date (days): median 0.0, max 1
+subset hourly vs 6-hourly, |diff| melt_onset (days): median 0.0, max 1
+subset hourly vs 6-hourly, |diff| melt_out (days): median 0.0, max 1
+profile points (subset index): [13, 20, 21]

@@ -33,7 +33,7 @@ project:
     downscaling_method: multicore
     setting:
       multicore:
-        CPU_cores: 6                     # set by overnight_E.py
+        CPU_cores: 14                     # set by overnight_E.py
       dask:
         n_workers: 4
         threads_per_worker: 1
