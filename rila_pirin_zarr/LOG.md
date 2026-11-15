@@ -299,3 +299,465 @@ Findings:
 - Disk: `data/runs` 42 GB, `data/runs_edh` 42 GB, `data/era5_600-1000hPa` 7.3 GB.
 - Queue lanes A/B/C ended by themselves (queue empty). Still running: `update_results.py --every 600` (harmless;
   stop it or leave it, results/ is final). Host watchdog stopped.
+
+## 2026-11-10 12:15-12:35 UTC: extension back to 1940 (user: "downscale also from 1985 until 1940")
+User request read as 1940-1984 ("1085" = 1985; ERA5 starts 1940-01-01). Same terrain, clusters, levels and
+products as 1985-2025; both series (NCAR 14 levels = final, EDH 5 levels = fast). Every move, in order:
+- **Container was stopped** (host restart since 11-09; this also ended the `update_results.py` refresher).
+  `docker compose up -d`: data intact, no stale `*.lock`, CDS credentials present (`/home/icam/.cdsapirc`).
+- **Data availability checked before configuring** (12:28): NCAR d633000 THREDDS catalog starts at `194001`;
+  NCSS subset of `t` for 1940-01-01, 1958-06-01, 1978-12-31, 1979-01-01: HTTP 200 each (the 1940-1978 back
+  extension is served with the same file names). CDS ERA5 single levels and EDH (LOG 11-06: 1940-01-01 ..) start 1940.
+- Disk 682 GB free (needs ~2 x 45 GB runs + ~8 GB ERA5); memory 53 GB available.
+- `make_configs.py --years 1940 1984`: 135 new configs (era5/, years/, years_edh/). `config_terrain.yml` rewritten
+  byte-identical (git: no change). Single levels from the CDS for all 45 years (none is in `NCAR_SURF`).
+- **Script changes (minimal):**
+  - `run_era5_queue.sh`, `run_downscale_all.sh`: `Y0 > Y1` counts down (`seq Y0 -1 Y1`; plain `seq 1984 1940` is
+    empty, so a lane would have ended at once with "queue empty"). Ascending calls behave as before.
+  - `update_results.py`: `YEARS = range(1940, 2026)`, title 1940-2025 (otherwise the new years never reach results/).
+- **Order decisions:**
+  - NCAR (final dataset) **newest first, 1984 -> 1940**: if the run is stopped early, the final series is still
+    continuous back from 2025.
+  - EDH **oldest first, 1940 -> 1984**: EDH takes ~20 min/year, so 1940 (earliest ERA5 year, pre-1970 = negative
+    Unix times, sparse-observation back extension) tests the whole chain within the first hour, hours before the
+    first NCAR year has its ERA5 (~6 h/year/lane).
+  - Lanes as in the 1985-2025 run: NCAR queue lanes A + B now, **lane C only after the EDH loop ends** (11-06: an
+    NCAR and an EDH year downscaling together peaked at 59/62 GB; a 3rd lane = +50 % NCAR throughput).
+- **Started 12:29-12:31 UTC** (all `docker exec -d`, logs in `data/logs/`, `*_20261110.log`):
+  `run_downscale_all.sh 1940 1984 edh`; `run_era5_queue.sh A 1984 1940` (took 1984), `B` (took 1983);
+  `run_downscale_all.sh 1984 1940`; waiter that starts `run_era5_queue.sh C 1984 1940` when the EDH log says
+  "all years done"; `update_results.py --every 600`.
+- Expected: EDH 45 years ~15 h (~Wed 11-11 04 UTC); NCAR ~45 years / 2-3 lanes x ~6 h -> ~4 days (~Sat 11-14).
+
+## 2026-11-10 12:45-13:10 UTC: EDH 1940-01 failed QA -> ERA5 start gap found and filled
+- **Symptom** (EDH 1940, first year of the test): `1940-01: failed checks`; `months/1940-01.json`: **LW 6773 values
+  < 50 W/m2, min -4.4** (all other variables in bounds; SW 16 = known sunset spike). Feb-Jun 1940: QA OK.
+- **Diagnosis:** the EDH input `data/era5_edh/1940/ERA5.zarr` has NaN in **ssrd, strd, tp only, at 1940-01-01 00..06
+  UTC (7 h x 110 cells = 770 values)**; nothing else in 1940 is missing. Cause: ERA5 starts 1940-01-01 00 UTC but
+  accumulated fields come from forecasts started 06/18 UTC, the first at 1940-01-01 06 UTC, so those 7 hours of
+  accumulations do not exist in ERA5. The fork turns the NaN into ~0: downscaled LW 17-19 W/m2 (should be ~200),
+  tp = 0 silently (passes QA), SW 0 (correct anyway, night). 6773 = the 7 h x 1002 clusters minus a few.
+- **Same problem waits in the NCAR series:** `convert_cds_surf` keeps t2m at every hour, so the 7 accumulation hours
+  would be NaN -> `check_unit` "NaN values" -> raw file to raw_bad/ -> the ~50 min whole-year CDS request repeated,
+  failing in both passes -> 1940 `ERA5_FAILED`.
+- **Decision: fill exactly those 7 hours in the ERA5 input** (not drop the hours: every year keeps 8760/8784 h;
+  not leave ~0 LW / invented tp). Values, chosen from the data:
+  - ssrd = 0: before sunrise; other years' 06 UTC value on 1 Jan is <= 1 W/m2 (1985/1990/2000/2020 max 0.5-0.96).
+  - tp = 0: 1940-01-01 07-12 UTC is dry everywhere (max 0.012 mm in one cell).
+  - strd = eps * sigma * t2m^4, eps per cell from 07 UTC (first valid hour; t2m exists at all hours) -> 196-199 W/m2
+    area mean (155-257 per cell), continuous with 07 UTC (200.5).
+- **Code (one function, two callers; fork untouched, raw data untouched):**
+  - `zarr_workflow/era5_download/era5_download.py`: `fill_era5_start_gap(ds)`; called in `convert_cds_surf` (NCAR
+    series, CDS single levels) and logged per unit. No-op unless those variables are NaN, **raises if NaN occurs
+    outside 1940-01-01 00-06 UTC** (a real data problem is never filled silently).
+  - `rila_pirin_zarr/scripts/run_year.py`: `fill_edh_start_gap(store)` after `get_era5` (EDH series): region write of
+    the first hours in place. Needed there because the fork's `assemble_zarr` rebuilds ERA5.zarr from the cached
+    edh_blocks on every run, so a one-off patch of the store would be lost on the retry.
+  - Backups: scratchpad `era5_download.py.bak_20261110`, `run_year.py.bak_20261110`.
+  - Safe for running jobs: every year starts a new python process (running ones keep their loaded code); the bash
+    loop/lane scripts were not edited (bash reads a running script from disk).
+- **Tests:** in memory on EDH 1940: 7 h x 3 variables filled, everything else bit-identical, float32 kept, idempotent,
+  1985 = no-op, a NaN outside the gap raises. In place on a copy of the 1940 store: only the 770 x 3 values changed,
+  time axis identical. CDS: real January 1940 request via the downloader (test config `data/tmp_cdstest/`): see below.
+- **Rerun of EDH 1940-01:** run_year redoes only months whose status is not "ok". The EDH loop marks 1940 RETRIED
+  (exit 1 because of January) and retries it after 1984; the retry rebuilds the store, fills the gap, redoes January.
+
+## 2026-11-10 12:47-13:16 UTC: EDH 1940-01 redone; second finding (packed solar geometry); EDH 1940 DONE
+- **Rerun 1 (`--months 1`) did not recompute anything:** "0 points to downscale (1002 already done)". The fork's
+  resume marks every point of a month as done (`down.zarr.progress/<month>/<i>.done`) when it is written, whether or
+  not the month later passes QA. -> January's markers moved to `runs_edh/1940/progress_bad/` (kept), rerun:
+  1002 points, QA OK, LW 1 Jan 00-06 UTC now 199-201 W/m2 (was 17-19), January LW min 119.8 W/m2.
+- **But SW had changed too** (16 -> 14 sunset spikes, SW at 08 UTC 168.49 -> 168.3), on every point and every
+  daylight hour of January, max 971 W/m2. Not accepted unexplained. Steps:
+  1. Same input twice -> bit-identical: the downscaling is deterministic.
+  2. Isolated run (copy of the EDH blocks, **pre-fix run_year.py**, gap NaN) -> reproduces run 1 exactly (16 spikes).
+  3. Fork `downscale_point` called directly for point 0, NaN vs filled input, same solar geometry -> **only LW
+     differs, only the 7 gap hours; SW bit-identical**. So the gap fill changes exactly what it should.
+  4. Cause of the SW change: **`ds_solar.zarr` is stored packed as int16 + scale_factor by the fork** (mu0 step
+     0.0009, SWtoa 1.27 W/m2, zenith 0.14 deg). A run that computes the solar geometry downscales with the exact
+     float64 values in memory; a rerun reads the packed store. Tiny everywhere, large only at tiny mu0 (sunset spikes).
+  5. Every 1985-2025 year (both series) has exactly one run_year log -> all downscaled with fresh float64 solar
+     geometry: the dataset is consistent. Only a resumed/redone month would use the packed values.
+- **Decision: January redone with fresh solar geometry** (ds_solar.zarr removed, month json + progress moved aside,
+  all three checked absent before the run). Result vs the isolated pre-fix fresh run: **SW, SW_direct, SW_diffuse,
+  t, tp bit-identical; LW differs only at 1940-01-01 00-06 UTC**. 16 SW spikes (same as fresh runs elsewhere).
+  (Two attempts were wasted on the way: one skipped the month because its json said ok, one still had the progress
+  markers. Rule now written down below.)
+- `--months` runs do not write the year products: one plain run_year call (all 12 months "complete, skipped") wrote
+  `year_summary.json` and **`t_mean_monthly_1940.tif`: check OK, range -11.8..25.1 degC**. `DONE` written by hand
+  (13:13, like 2006 on 11-06), so the loop's retry after 1984 skips 1940.
+- **Rule for redoing a month M of year Y:** move aside `outputs/months/Y-M.json`, `outputs/downscaled/down.zarr.progress/
+  <M folder>`, and delete `outputs/ds_solar.zarr` (recomputed fresh, ~52 s); run `run_year.py ... --months M`; then
+  one run without `--months` for the year products.
+- EDH 1941 DONE 13:05 (19 min); loop on 1942. NCAR lanes: 1984 242 and 1983 231 parts by 13:15 (~320/h/lane,
+  ~6.8 h/year), ~4 % first attempts time out, all retried (as last week). Memory 33/62 GB used.
+- Test files removed (`data/tmp_det/`, the pre-fix script copy). CDS January 1940 test still running.
+
+## 2026-11-10 14:44 UTC: CDS test January 1940 (NCAR series path) passed
+- Downloader on a January-1940 test config, `download --only surf`: CDS request queued/run 123 min (slow CDS today;
+  last week 51-65 min/yearly request; still shorter than a lane's ~6.8 h of pressure levels per year).
+- The CDS GRIB has the **same gap** (ssrd/strd/tp, 1940-01-01 00-06 UTC); `convert_cds_surf` filled it
+  ("ERA5 start gap ... filled, hours per variable {'ssrd': 7, 'strd': 7, 'tp': 7}") and the unit was **written and
+  verified** (no NaN). Filled strd 195.62/196.05/... W/m2, 07 UTC 200.46 (EDH 200.47: one float32 step) -> both
+  series get the same ERA5 input in the gap. NCAR 1940 needs nothing by hand. Test folder removed.
+- EDH series: 1940-1946 DONE by 14:44 (~19 min/year), no RETRIED/FAILED since 1940.
+
+## 2026-11-10 19:05 UTC: first NCAR years of the extension verified
+- NCAR ERA5_OK: **1983 18:52, 1984 19:05** (~6.4-6.6 h per year per lane, as expected). 1984: one corrupt raw file
+  (`ncar_plev_1984-10-22_t.nc`, 17:40) set aside in raw_bad/ and re-downloaded by the second pass (fix of 11-06).
+  CDS single levels: one request per year, 280-287 s to write. Lanes moved on to 1982 / 1981.
+- NCAR 1983 downscaling started 19:01 (loop takes verified years in its 1984->1940 order; 1984 next).
+  Jan/Feb QA OK. Memory with an NCAR and an EDH year downscaling together: 26 GB used, 36 GB available.
+- EDH: 1940-1961 DONE (22/45), no RETRIED/FAILED since 1940.
+
+## 2026-11-11 ~03 UTC: EDH vs NCAR check on an extension year (1983 vs 1985)
+- NCAR DONE: 1984, 1983, 1982, 1981 (series continuous 1981-2025). EDH: 1940-1983 DONE (44/45).
+- Daily t_mean EDH minus NCAR per cluster, by centroid band (year / Jan / Jul / days |d| > 1 K):
+  | band | 1983 | 1985 |
+  |---|---|---|
+  | <800 m | -0.18 / -0.23 / -0.07 / 6.8 % | -0.15 / -0.26 / -0.10 / 5.4 % |
+  | 800-1500 | -0.01 / +0.00 / -0.03 / 0.0 % | -0.01 / -0.00 / -0.04 / 0.0 % |
+  | 1500-2000 | +0.04 / -0.02 / +0.05 / 1.5 % | +0.04 / -0.22 / +0.07 / 1.9 % |
+  | >=2000 | +0.14 / -0.04 / +0.23 / 9.1 % | +0.16 / -0.34 / +0.31 / 8.6 % |
+  Same annual offsets per band; the January alpine offset depends on the winter (inversions the 5 EDH levels miss).
+  -> the extension behaves like 1985-2025; the two series still must not be mixed.
+
+## 2026-11-11 01:42 UTC: EDH series complete 1940-2025; NCAR lane C started
+- **EDH 1940-1984: 45/45 DONE** (01:38:58; loop: "all years done: 86 DONE, 0 FAILED" = EDH 1940-2025 complete).
+  ~17-20 min per year; the only problem was 1940-01 (start gap, fixed). No RETRIED/FAILED otherwise.
+- Lane C waiter fired as planned; **lane C took 1978 at 01:41** (A 1980, B 1979). CDS single-level request accepted
+  after 3 s. Memory 6 GB used now (only NCAR downscales from here on).
+- NCAR: 1981-1984 DONE. Remaining 41 years (3 running + 38 queued) / 3 lanes x ~6.5 h -> ~14 rounds ->
+  **NCAR series complete ~Sat 2026-11-14 evening to Sun 11-15 morning UTC** if NCAR holds this speed.
+
+## 2026-11-11 ~12:00 UTC: NCAR 1978-1980 DONE; second aspect bug found (azimuth convention), runs NOT stopped
+- NCAR 1980 (07:32), 1979 (07:45), 1978 (08:51) DONE; 12/12 months QA ok, 0 failed points; t_mean monthly
+  ranges 1980 -10.7..25.2, 1979 -9.2..23.9 (EDH -9.3..23.9), 1978 -9.2..25.0 degC. NCAR now 1978-1984 done.
+- Trigger: `git fetch andrei` (read-only, nothing merged): Andrei's commit 2460386 "aspect fix + some validation"
+  reruns his years with a fixed TopoPyScale (his local bbd0296, branch fix/aspect-azimuth-convention; "aspect / SW /
+  vertical-fallback fixes"; the code and his CHANGELOG are NOT on GitHub, only his log and check_year_fixed.py).
+- **Diagnosis in our fork (same bug, NOT covered by our centroid fix of 2026-11-05):**
+  - aspect: `topocalc.gradient.gradient_d8` -> degrees clockwise from NORTH; topo_param.py:250 only does deg2rad.
+  - sun azimuth: solar_geom.py:81 `deg2rad(180 - pvlib_azimuth)` -> 0 = SOUTH, positive east (its docstring says so).
+  - topo_scale_zarr.py:242 `cos(azimuth - aspect)` mixes the two: north and south are swapped (E/W happen to match).
+  - Our centroid fix (circular mean) keeps the north convention, so it does not touch this.
+- **Check on our output (read-only, NCAR 2000, 876 clusters with slope >= 10 deg, DJF means):**
+  | sector | SW_direct DJF | SW DJF | SW JJA | n |
+  |---|---|---|---|---|
+  | N | 92.2 | 123.9 | 269.9 | 210 |
+  | E | 47.0 | 78.5 | 242.5 | 226 |
+  | S | 19.8 | 51.2 | 236.8 | 208 |
+  | W | 64.2 | 95.7 | 267.7 | 232 |
+  North slopes get ~4.7x the winter direct SW of south slopes: physically reversed at 42 N. Also SW_direct max
+  1920 W/m2 (> solar constant; the known sunset spikes, Andrei: "old code had spikes up to ~2900").
+- Affected: SW and SW_direct (SW_diffuse uses svf, not the illumination angle) in BOTH series, ALL years 1940-2025.
+  Not affected: t, q, p, u, v, ws, wd, tp, LW (TopoSCALE computes them without the illumination angle), so the
+  t_mean GeoTIFFs and every temperature result stand.
+- **Decision: keep the NCAR 1940-1977 runs going.** Stopping would not save anything: a fix only needs a
+  re-downscale per year from the ERA5 already on disk (~20 min/year/lane), and the download is the slow part.
+  The fix itself is a fork change and must not be applied while lanes import the fork (mixed code within the series).
+- Fix not applied; waiting for the user (to-do list given in the session). Script: scratchpad aspect_check.py.
+
+## 2026-11-11 ~12:30 UTC: station validation of temperature (both series), read-only on the runs
+- User: validate temperature only, both periods (recent METER.AC + long NOAA). Runs not touched (nice 19, reads DONE years).
+- Stations: NOAA ISD hourly downloaded to rila-pirin-data/stations/noaa_isd_hourly (179 files, 16 MB; Musala 156150,
+  Sandanski 157120, Ihtiman 156220, Berovo 135980). GHCN-Daily has no station in the domain (checked ghcnd-stations).
+  Ihtiman and Berovo are inside the rectangle but outside the clustering mask -> dropped. Used: Musala, Sandanski
+  + 28 METER.AC nodes (2018-2026).
+- Decisions: Musala ISD coordinates (3 decimals) hit a 2713 m pixel -> took the METER.AC N306 position (same summit,
+  2917 m pixel). Day valid = all 8 synoptic hours or >= 20 h; model sampled at the station's hours (1950s: almost
+  no valid days, so the long record starts ~1960). Elevation adjustment with a daily local lapse rate (50 nearest
+  clusters, as Andrei). ISD quality codes 2/3/6/7 dropped; METER.AC only 'complete' hours.
+- New scripts: scripts/stations_prepare.py, scripts/station_compare.py -> data/validation/{stations.csv,obs_hourly,
+  ncar,edh}.
+- Results t_mean (station elevation), EDH 1940-2025 / NCAR 1978-2025 (NCAR still running):
+  - Musala (NOAA): +0.87 / +0.77 K, RMSE 1.44 / 1.38, r 0.99. METER.AC Musala gives the same (+0.85 / +0.80):
+    the two independent records agree. Without the elevation adjustment +1.43 / +1.35 (cluster centre 92 m lower).
+  - Sandanski 207 m: -0.27 (EDH) vs +1.04 (NCAR); r 0.96 / 0.98. Series differ most here (valley, low levels).
+  - METER.AC 375-2525 m: -2.1 .. +2.7 K; most valley/basin nodes +1 .. +2.7 K, warm in Oct-Feb (missed cold pools).
+  - Everywhere t_max too low and t_min too high (Sandanski EDH t_max -3.3, t_min +2.2; Musala -0.2 / +1.9):
+    diurnal range too small, as Andrei found in the Carpathians.
+  - Per decade the bias is stable at Musala (0.7-1.3 K, 1960s-2020s); Sandanski t_min bias grows (+1.8 -> +2.7 K).
+  - Sandanski Feb-Mar and Sep-Oct negative, Jun-Aug positive in EVERY decade -> a real model feature, not sampling.
+  - Lag test: t_min fits the model's same day best at Musala (0.982 vs 0.932); at Sandanski same day and day before
+    are equal (0.928 / 0.930).
+
+## 2026-11-11 ~13:10 UTC: validation figures, steps 1 and 2 of the plan (user: "1 and 2 now, and 3 and 4 later")
+- Plan (from the comparison with the authors' Finse example and Andrei's 9 Nov figures):
+  1 authors' hourly view (density scatter, regression, N/r/RMSE/bias; topo_compare.obs_vs_downscaled style,
+    bias sign flipped to model - station like all our tables), 2 Andrei's daily scatter grid + monthly heatmap,
+  3 later: point downscaling (method: points) at the stations, 4 later: lapse-adjusted maps for chosen periods.
+- station_compare.py now also writes matched_hourly.parquet (every station hour; cluster and station-elevation
+  model). New scripts/station_plots.py -> data/validation/<series>/plots/: hourly_density_{recent,longterm}.png,
+  daily_scatter_{recent,longterm}.png, monthly_heatmap_recent.png, monthly_heatmap_longterm_{Musala,Sandanski}.png,
+  hourly_stats_{recent,longterm}.csv. recent = 2018-2025, 23 stations with >= 200 valid days.
+- Seen in the hourly view (EDH): regression slopes 0.69-0.94 (model range too small), lowest at valley nodes
+  (Dolno Draglishte 0.69, Riltsi/Boboshevo 0.73) with RMSE 4.7-6.0 K; ridges/high sites 0.89-0.94, RMSE 1.8-2.9 K.
+  Musala long-term decade x month heatmap: +1.2..+1.9 K in Nov-Feb, +0..+0.5 K in Jul-Aug in every decade.
+
+## 2026-11-12 ~11:30 UTC: raw ERA5 baseline for the station validation (NCAR)
+
+**Why.** The station plots showed how good TopoSCALE is, not what it adds. A downscaling has to be compared with what
+you would have without it (user's request).
+**What.** New `scripts/era5_baseline.py`. It reads `data/validation/ncar/matched_hourly.parquet`, so it uses the
+same station hours, valid days and statistics as TopoSCALE. It compares four versions:
+- `era5_raw`: ERA5 t2m of the nearest grid cell.
+- `era5_lapse`: t2m bilinear + (-6.5 K/km) × (station elevation - ERA5 orography, z_surf/g bilinear).
+- `ts_cluster`: TopoSCALE, the cluster value.
+- `ts_station`: TopoSCALE at station elevation.
+ERA5 comes from `data/era5_600-1000hPa/<y>/ERA5.zarr` (single levels from CDS, the same ERA5 surface data the EDH
+series uses). Skill = 1 - RMSE(TopoSCALE)/RMSE(ERA5).
+Before it, `station_compare.py --series ncar` was rerun to cover NCAR 1966-2025.
+Outputs in `data/validation/ncar/plots/era5_*`. The runs are only read.
+
+**Decisions.**
+- Two ERA5 references. Raw ERA5 is the "no downscaling" case. The lapse-corrected one is the cheap alternative a
+  reviewer will ask about, so TopoSCALE is judged against both.
+- Fixed -6.5 K/km, not the daily local lapse rate. That rate is fitted on TopoSCALE clusters, so it would leak
+  model information into the baseline.
+
+**Result, RMSE of daily t_mean, NCAR, same days for all versions:**
+
+| station | period | raw | +lapse | TopoSCALE |
+|---|---|---|---|---|
+| Musala NOAA | 2018-2025 | 10.2 | 2.9 | 1.4 K |
+| Musala NOAA | 1966-2025 | 10.2 | 3.1 | 1.4 K |
+| Sandanski NOAA | 1966-2025 | 2.6 | 1.5 | 2.2 K |
+
+- TopoSCALE clearly adds value at stations ABOVE the ERA5 orography: Musala (+1620 m), Malyovitsa (+740 m),
+  Ortsevo, Obidim, Popovi livadi (+456 m, vs raw). Skill there is +0.3..+0.6 against ERA5 + lapse.
+- At most valley and low stations, BELOW the ERA5 orography (Sandanski -610 m, Dolno Draglishte -640 m, Garmen,
+  Riltsi, Boboshevo, Dabnitsa ...), TopoSCALE is WORSE than ERA5 + lapse (skill -0.5..-1.3). On daily t_min it is
+  often worse than raw ERA5 too.
+- In the monthly bias, ERA5 + lapse is +1..+2 K in winter and ~0 in summer at the valley stations. TopoSCALE is
+  +2..+4 K in winter and +1..+1.5 K in summer, so warmer all year, not only in winter.
+
+**Hypothesis, not yet checked.** Below the ERA5 surface, TopoSCALE uses pressure-level temperature that ERA5
+extrapolates underground (no boundary layer, no inversion). ERA5 t2m does include the surface layer. This would
+explain why the sign of the skill follows station elevation minus ERA5 orography. Andrei's unreleased
+"vertical-fallback" fix may be about this case. To check: TopoPyScale's handling of points below the lowest valid
+level, and skill vs dz_station_minus_era5 as one plot.
+
+## 2026-11-12 ~11:50 UTC: units checked; station spikes removed
+
+- **Units.** The user asked for attention to °C vs K. Checked at every step:
+  - ERA5 t2m is in K (249.7..312.4) and is converted to °C (`- 273.15`).
+  - down.zarr t is in K (253..282 in Jan 1980) and is converted to °C in station_compare.py.
+  - Station data is in °C.
+  - Temperatures are labelled [degC] and differences (bias, RMSE) [K]. A difference of 1 K equals 1 °C. No error.
+- **Found while checking.** The observed minimum was -55.0 °C: ISD passed Musala -55.0 at 1995-11-20 13 UTC
+  (-16.3 and -17.6 around it), and +29.0 / +29.5 °C in summer at 2925 m.
+- **Fix: `despike()` in stations_prepare.py.** Applied to ISD and METER.AC.
+  - Physical limits: -40..+46 °C everywhere, max +25 °C at Musala.
+  - Isolated spikes: a reading that jumps away from BOTH neighbours in the same direction by > 10 K (neighbours
+    <= 3 h) or > 20 K (<= 6 h). The second rule covers old 6-hourly records, where 10 K can be a real afternoon peak.
+- **Rejected first version.** Dropping > 5 robust sigmas from the monthly median also removed real cold spells
+  (Malyovitsa -15 °C in December, Ihtiman -27 °C in Jan 1954). Real cold pools build up over hours; spikes don't.
+  Dolno Draglishte at -16 °C under +5 °C free air is kept: a real Razlog-basin cold pool.
+- **Effect.** 16 of ~410k hours dropped (Musala 10, Sandanski 5, Berovo 1). Observed range is now -31.6..+42.9 °C.
+  Daily statistics are unchanged at 2 decimals, since the spikes were mostly on days that are not valid anyway.
+  The hourly scatter axes no longer stretch to -55.
+- **Rerun.** stations_prepare, then station_compare (ncar, edh), then station_plots (ncar, edh), then
+  era5_baseline (ncar).
+
+## 2026-11-12 ~14:20 UTC: validation step 3, TopoSCALE run at the station points (NCAR 2018-2025)
+
+**Why.** To separate the clustering error from TopoSCALE's own error (user: "3+", i.e. go on with step 3). This is
+the authors' approach in their Finse example.
+**Setup.** New `scripts/points_setup.py`:
+- 32 points = the stations in the domain (stations.csv). Elevation = the surveyed station elevation; pixel
+  elevations are within 15 m.
+- Slope, aspect and svf come from the station's 30 m pixel. The horizon is sampled by compute_horizon.
+  aspect_arith = aspect.
+- Outputs go to `data/points/` (terrain links, df_centroids.pck, stations_points.csv, runs/<YYYY>, logs).
+- Configs are `config/points/config_points_<YYYY>.yml`: copies of config/years with sampling method `points`,
+  `CPU_cores: 4` so the NCAR queue keeps its 24, and directory data/points/runs.
+- **Decision: no new runner.** `run_year.py` is used unchanged, with `--terrain data/points/terrain --months 1..12`.
+  The explicit month list skips the monthly GeoTIFF, which has no meaning for points, and the code the live queue
+  runs stays untouched.
+- Run: about 7 s per month, 2018-2025 all ok.
+- `era5_baseline.py` gained the version `ts_point`. New outputs: points_bias_rmse_recent.png,
+  points_skill_recent.png, points_monthly_bias_recent.png, era5_stats_recent_points.csv.
+
+**Result.**
+- The point run equals the station-adjusted cluster value within 0.0-0.2 K RMSE at every station; Musala 1.38 vs
+  1.37 K. So the clustering (k=1000 in 4 elevation groups) plus the local lapse adjustment costs almost nothing.
+- **The valley error is TopoSCALE's own, not the clustering's.** At the valley and low stations, ERA5 t2m with a
+  -6.5 K/km correction still beats TopoSCALE, e.g. Boboshevo 1.8 vs 3.4 K, Dabnitsa 1.4 vs 3.2 K, Riltsi 2.3 vs
+  3.9 K. The RMSE gap there is larger than the bias gap, so TopoSCALE also follows the day-to-day variation worse
+  (free-air temperature).
+
+**Why, from the code** (`topo_scale_zarr.py` ~150-185, same logic as upstream topo_scale.py):
+- TopoSCALE temperature is linear interpolation between the two pressure levels that bracket the point's height.
+  ERA5 t2m is never used for t. Where the ERA5 orography is above the valley floor, those levels are ERA5's
+  underground extrapolation: no surface layer, no cold pools.
+- **Vertical fallback.** If a point is below z(1000 hPa) at ANY hour of the period downscaled, then for EVERY
+  hour t = the temperature of the lowest level above the point, with no interpolation. Within a monthly run that
+  means every hour of the month.
+  - It affects 29 of the 1002 clusters (the lowest, Struma/Mesta) in both series, and the Sandanski point.
+  - With EDH's 5 levels the "level above" is 925 hPa (~750 m), against 975 hPa with NCAR's 14 levels. This
+    probably explains Sandanski -0.3 K (EDH) vs +1.0 K (NCAR).
+  - Candidate for Andrei's unreleased "vertical-fallback" fix. Not changed here.
+
+**Next.**
+- Decide with the user whether to try a near-surface correction for the valleys, e.g. use ERA5 t2m
+  (lapse-corrected) below the ERA5 orography. This is an idea to test; I have not checked what the TopoSCALE
+  literature does there.
+- The fallback fix needs the same re-downscale as the aspect fix, so both should go into one re-run.
+
+### 2026-11-12 19:07 UTC: NCAR 1962 DONE
+ERA5_OK 18:53, downscaled 18:53–19:06. QA hourly OK 12/12. Monthly t_mean GeoTIFF range −11.1..28.2 °C.
+The 28.2 °C maximum is the highest NCAR year so far (1963: 27.2), so I checked it against EDH 1962: −11.0..28.2 °C,
+the same. The hot July/August 1962 comes from the shared ERA5 forcing, not from a model fault. Accepted.
+Lanes now: A 1959, B 1961 (mid-December), C 1960 (late October).
+
+### 2026-11-12 19:41 UTC: NCAR 1961 DONE
+ERA5_OK 19:22, downscaled 19:27–19:40. QA hourly OK 12/12, no errors. GeoTIFF range −9.0..25.9 °C (EDH 1961 −9.1..25.9). Accepted.
+
+### 2026-11-12 20:36 UTC: NCAR 1960 DONE
+ERA5_OK 20:19, downscaled 20:22–20:35. QA hourly OK 12/12, no errors. GeoTIFF range −8.0..26.0 °C (EDH 1960 −8.1..26.0). Accepted.
+25/45 NCAR years done (1960–1984). Downloading: 1959, 1958, 1957.
+
+### 2026-11-13 02:14 UTC: NCAR 1959 DONE
+ERA5_OK 01:53, downscaled 02:00–02:13. QA hourly OK 12/12, no errors. GeoTIFF range −9.2..25.5 °C (EDH 1959 −9.3..25.5). Accepted.
+26/45 NCAR years done (1959–1984). Downloading: 1958, 1957, 1956.
+
+### 2026-11-13 02:58 UTC: NCAR 1958 DONE
+ERA5_OK 02:35, downscaled 02:44–02:57. QA hourly OK 12/12, no errors. GeoTIFF range −9.2..27.5 °C (EDH 1958 −9.2..27.5). Accepted.
+27/45 NCAR years done (1958–1984). Downloading: 1957, 1956, 1955.
+
+### 2026-11-13 03:52 UTC: NCAR 1957 DONE
+ERA5_OK 03:30, downscaled 03:38–03:51. QA hourly OK 12/12, no errors. GeoTIFF range −8.4..27.0 °C (EDH 1957 −8.5..27.0). Accepted.
+28/45 NCAR years done (1957–1984). Downloading: 1956, 1955, 1954.
+
+### 2026-11-13 08:39 UTC: NCAR 1956 DONE
+ERA5_OK 08:16, downscaled 08:25–08:38. QA hourly OK 12/12, no errors. GeoTIFF range −12.2..28.5 °C (EDH 1956 −12.2..28.5).
+28.5 °C is the warmest monthly-mean pixel of any NCAR year so far, and −12.2 °C the coldest since 1965 (−13.6).
+EDH 1956 is identical, so both come from the ERA5 forcing (summer 1956 warm, February 1956 the well-known
+extreme cold month in Europe). Accepted.
+29/45 NCAR years done (1956–1984). 1955 downscaling; downloading 1954, 1953 (+ next lane).
+
+### 2026-11-13 08:52 UTC: NCAR 1955 DONE
+ERA5_OK 08:32, downscaled 08:38–08:51. QA hourly OK 12/12, no errors. GeoTIFF range −6.7..25.3 °C (EDH 1955 −6.6..25.3).
+Mildest winter minimum so far (mild winter 1954/55 in the ERA5 forcing; EDH the same). Accepted.
+30/45 NCAR years done (1955–1984). Downloading: 1954, 1953, 1952.
+
+### 2026-11-13 09:16 UTC: NCAR 1954 DONE
+ERA5_OK 08:59, downscaled 09:02–09:15. QA hourly OK 12/12, no errors. GeoTIFF range −12.6..27.0 °C (EDH 1954 −12.6..27.0).
+Cold winter, consistent with the Ihtiman −27 °C hourly observations in January 1954 kept by despike() (LOG 2026-11-12). Accepted.
+31/45 NCAR years done (1954–1984). Downloading: 1953, 1952, 1951.
+
+### 2026-11-13 14:15 UTC: NCAR 1953 DONE
+ERA5_OK 13:56, downscaled 14:01–14:14. QA hourly OK 12/12, no errors. GeoTIFF range −10.0..26.9 °C (EDH 1953 −10.0..26.9). Accepted.
+32/45 NCAR years done (1953–1984). Downloading: 1952, 1951, 1950.
+
+### 2026-11-13 14:38 UTC: NCAR 1952 DONE
+ERA5_OK 14:18, downscaled 14:25–14:38. QA hourly OK 12/12, no errors. GeoTIFF range −10.6..30.1 °C (EDH 1952 −10.6..30.1).
+30.1 °C is the highest monthly-mean pixel of all NCAR years so far (previous 28.5 in 1956). EDH 1952 is identical, so it
+comes from the ERA5 forcing, not from the 14-level run. It is a monthly mean at the warmest low valley pixel; note that
+TopoSCALE is warm-biased in the valleys (validation, LOG 2026-11-12), so the true value there was probably lower.
+Accepted. 33/45 NCAR years done (1952–1984). 1951 downscaling; downloading 1950, 1949 (+ next lane).
+
+### 2026-11-13 14:52 UTC: NCAR 1951 DONE
+ERA5_OK 14:35, downscaled 14:38–14:51. QA hourly OK 12/12, no errors. GeoTIFF range −7.3..27.3 °C (EDH 1951 −7.4..27.3). Accepted.
+34/45 NCAR years done (1951–1984). Downloading: 1950, 1949, 1948.
+
+### 2026-11-13 20:30 UTC: NCAR 1950 DONE
+ERA5_OK 20:11, downscaled 20:16–20:29. QA hourly OK 12/12, no errors. GeoTIFF range −10.8..28.6 °C (EDH 1950 −10.9..28.6). Accepted.
+35/45 NCAR years done (1950–1984). Downloading: 1949, 1948, 1947.
+
+### 2026-11-13 20:53 UTC: NCAR 1948 DONE
+ERA5_OK 20:35 (before 1949: lanes finish out of order; run_downscale_all.sh skips years without ERA5_OK and runs
+whichever is ready, so this needs no action). Downscaled 20:39–20:52. QA hourly OK 12/12, no errors.
+GeoTIFF range −10.7..27.4 °C (EDH 1948 −10.8..27.4). Accepted. 36/45 NCAR years done. 1949 downscaling; downloading 1947, 1946 (+ next lane).
+
+### 2026-11-13 21:06 UTC: NCAR 1949 DONE
+ERA5_OK 20:42, downscaled 20:52–21:05. QA hourly OK 12/12, no errors. GeoTIFF range −9.8..24.5 °C (EDH 1949 −9.7..24.5). Accepted.
+37/45 NCAR years done (1948–1984). Downloading: 1947, 1946, 1945. Left: 1940–1947.
+
+### 2026-11-14 03:27 UTC: NCAR 1947 DONE
+ERA5_OK 03:12, downscaled 03:13–03:26. QA hourly OK 12/12, no errors. GeoTIFF range −12.5..26.5 °C (EDH 1947 −12.6..26.5). Accepted.
+38/45 NCAR years done (1947–1984). Downloading: 1946, 1945, 1944. Left: 1940–1946.
+
+### 2026-11-14 04:01 UTC: NCAR 1946 DONE
+ERA5_OK 03:37, downscaled 03:47–04:00. QA hourly OK 12/12, no errors. GeoTIFF range −9.7..29.3 °C (EDH 1946 −9.7..29.3).
+Warm summer maximum (second after 1952's 30.1); identical in EDH, so it comes from the ERA5 forcing. Accepted.
+39/45 NCAR years done (1946–1984). 1945 downscaling; downloading 1944, 1943 (+ next lane).
+
+### 2026-11-14 04:14 UTC: NCAR 1945 DONE
+ERA5_OK 03:45, downscaled 04:01–04:14. QA hourly OK 12/12, no errors. GeoTIFF range −11.7..28.1 °C (EDH 1945 −11.7..28.1). Accepted.
+40/45 NCAR years done (1945–1984). Downloading: 1944, 1943, 1942. Left: 1940–1944.
+
+### 2026-11-14 10:28 UTC: NCAR 1944 DONE
+ERA5_OK 10:13, downscaled 10:14–10:27. QA hourly OK 12/12, no errors. GeoTIFF range −10.4..25.0 °C (EDH 1944 −10.3..24.9). Accepted.
+41/45 NCAR years done (1944–1984). 1943 downscaling, 1942 ERA5_OK (queued), downloading 1941 (+ 1940 next).
+
+### 2026-11-14 10:40 UTC: NCAR 1943 DONE
+ERA5_OK 10:24, downscaled 10:27–10:40. QA hourly OK 12/12, no errors. GeoTIFF range −10.3..28.4 °C (EDH 1943 −10.4..28.4). Accepted.
+42/45 NCAR years done (1943–1984). 1942 downscaling; downloading 1941, 1940 (third lane idle: nothing left to fetch).
+
+### 2026-11-14 10:53 UTC: NCAR 1942 DONE
+ERA5_OK 10:27, downscaled 10:40–10:53. QA hourly OK 12/12, no errors. GeoTIFF range −13.4..26.3 °C (EDH 1942 −13.4..26.3).
+Coldest monthly-mean pixel since 1965 (−13.6); EDH identical, so it is the ERA5 forcing (the war winters 1940–42 were
+very cold in Europe). Accepted. 43/45 NCAR years done (1942–1984). Downloading 1941, 1940.
+
+### 2026-11-14 16:26 UTC: NCAR 1941 DONE
+ERA5_OK 16:05, downscaled 16:13–16:26. QA hourly OK 12/12, no errors. GeoTIFF range −10.4..26.4 °C (EDH 1941 −10.5..26.4). Accepted.
+44/45 NCAR years done. All ERA5 downloads finished; 1940 (last year) downscaling.
+
+### 2026-11-14 16:39 UTC: NCAR 1940 DONE, NCAR series complete
+ERA5_OK 16:04, downscaled 16:26–16:38. QA hourly OK 12/12, no errors. GeoTIFF range −11.7..25.1 °C (EDH 1940 −11.8..25.1). Accepted.
+run_downscale_all.sh: "all years done: 86 DONE, 0 FAILED". The download queues A/B/C have exited.
+Both series now cover 1940–2025: NCAR (14 levels, data/runs) and EDH (5 levels, data/runs_edh).
+Check over the 1940–1984 extension (45 years, 10–12 Nov): every year QA 12/12; no year needed a rerun.
+Every monthly GeoTIFF range is within 0.15 K of the EDH run for the same year, at both ends. NCAR and EDH share
+the surface forcing and differ only in the pressure levels, so their spatial extremes should agree, and they do.
+Extremes of the extension: warmest monthly-mean pixel 30.1 °C (1952), coldest −13.6 °C (1965). Both come from the
+forcing (EDH the same).
+Next: station_compare.py / station_plots.py / era5_baseline.py rerun for NCAR (now 1940–2025), started 16:40.
+
+### 2026-11-14 ~16:55 UTC: NCAR validation rerun on the full 1940–2025 series
+station_compare.py --series ncar, station_plots.py --series ncar and era5_baseline.py --series ncar were rerun
+(exit 0). All plots in data/validation/ncar/plots/ were refreshed.
+- The extension adds few observations, because the ISD records start late: Musala from 1964-01, Sandanski from
+  1959-01. No in-domain station has hourly data for 1940–1958, so those 19 years cannot be checked against stations.
+  They are checked only by the QA and by agreement with EDH (LOG entries above).
+- Daily t_mean RMSE, long term (K):
+
+  | Station | Raw ERA5 | ERA5 + lapse rate | TopoSCALE, cluster | TopoSCALE, station elevation |
+  |---|---|---|---|---|
+  | Musala | 10.17 | 3.14 | 1.76 | 1.40 |
+  | Sandanski | 2.58 | 1.51 | 2.16 | 2.16 |
+
+  These are practically unchanged from the 1966–2025 numbers (LOG 2026-11-12).
+- Decade bias of t_mean (decade_bias.csv, TopoSCALE − obs):
+  - Musala: +1.18 K in the 1960s, then +0.63 to +0.93 K.
+  - Sandanski: +1.15 K in the 1950s (n=129), then +0.86 to +1.21 K.
+  - There is no break or drift when the series is extended back. Sandanski's t_min bias grows slowly
+    (+2.9 K in the 1950s/60s to +3.9 K in the 2010s/20s), which is consistent with a valley cold-pool that
+    TopoSCALE cannot see. It was already visible before the extension.
+- Conclusion unchanged: TopoSCALE adds most at stations above the ERA5 orography, and is worse than ERA5 + lapse rate
+  in the low valleys.
+Next (open): the azimuth fix and the vertical-fallback fix, then re-downscale both series; validation step 4.
+
+### 2026-11-15: validation on both series, 1940–2025 (NCAR and EDH)
+station_compare.py, station_plots.py and era5_baseline.py were run with --series ncar edh (exit 0).
+This is the first raw-ERA5 baseline for EDH; the ERA5 baseline is the same file for both, because they share the
+surface data. Outputs: data/validation/{ncar,edh}/ and their plots/. Run log: scratchpad val_all.log.
+- Daily t_mean RMSE over the full station record (Musala 1964–2025, Sandanski 1959–2025), K:
+
+  | Station | Raw ERA5 | ERA5 + lapse | TopoSCALE, NCAR | TopoSCALE, EDH |
+  |---|---|---|---|---|
+  | Musala (2925 m) | 10.17 | 3.14 | 1.40 | 1.44 |
+  | Sandanski (207 m) | 2.58 | 1.51 | 2.16 | 2.39 |
+
+  TopoSCALE values use the station elevation.
+- 2018–2025, 24 stations: TopoSCALE beats ERA5+lapse at 6 stations, in both series: Pletena, Grashevo,
+  Obidim, Ortsevo, Malyovitsa, Musala. ERA5+lapse is better at the other 18, mostly low or valley stations.
+  NCAR and EDH differ by at most ~0.1 K, except at Sandanski.
+- Sandanski: EDH t_mean bias is −0.27 K (NCAR +1.02), but the EDH RMSE is larger. This is compensation, not a better
+  model: EDH t_max is −3.3 K (NCAR −2.0) and EDH t_min +2.2 K (NCAR +3.5). The point lies below z(1000 hPa), so the
+  vertical fallback takes the lowest level above it: 925 hPa in EDH (5 levels), versus a lower level in NCAR.
+  That gives a damped daily cycle. This is further evidence that the vertical-fallback fix is needed.
+- Conclusion for both series: TopoSCALE adds value above the ERA5 orography, and the low valleys are its weak spot.
+  NCAR ≥ EDH (more levels); the difference matters only below ~1000 hPa.

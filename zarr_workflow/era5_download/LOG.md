@@ -444,3 +444,9 @@ CDS spot checks (NCAR = CDS was shown above for all 13 variables).
   (normal size, unreadable) and `download_ncar` reuses an existing raw file, so the second pass could not fix it.
 - Change: when conversion/checks of a downloaded unit fail, the raw file moves to `<year>/raw_bad/` (kept for
   inspection) and the next pass downloads it again. Re-download of that unit: OK in 1.6 min, 2006 verified.
+
+## 2026-11-10: ERA5 start gap (1940-01-01 00-06 UTC) filled in `convert_cds_surf`
+- ERA5's accumulated fields (ssrd, strd, tp) do not exist for 1940-01-01 00..06 UTC (first forecast starts
+  1940-01-01 06 UTC). A whole-year CDS single-level request for 1940 would fail `check_unit` (NaN) on every attempt.
+- New `fill_era5_start_gap(ds)`: ssrd = 0, tp = 0, strd = eps(07 UTC) * sigma * t2m^4, only for those 7 hours; raises on
+  NaN elsewhere; no-op for every other period. Values and reasons: `rila_pirin_zarr/LOG.md` 2026-11-10.

@@ -10,13 +10,14 @@ set -uo pipefail
 R=rila_pirin_zarr
 stamp() { date -u +'%Y-%m-%d %H:%M:%S UTC'; }
 Y0=${1:?first year}; Y1=${2:?last year}; V=${3:-}
+STEP=1; [ "$Y0" -gt "$Y1" ] && STEP=-1     # Y0 > Y1: newest year first (added 2026-11-10)
 CONF=$R/config/years; RUNS=$R/data/runs
 [ "$V" = edh ] && CONF=$R/config/years_edh && RUNS=$R/data/runs_edh
 until [ -f $R/data/terrain/outputs/terrain_summary.json ]; do sleep 120; done
 echo "[$(stamp)] terrain ready"
 while true; do
   left=0; ran=0
-  for Y in $(seq "$Y0" "$Y1"); do
+  for Y in $(seq "$Y0" "$STEP" "$Y1"); do
     D=$RUNS/$Y
     [ -f "$D/DONE" ] || [ -f "$D/FAILED" ] && continue
     left=1

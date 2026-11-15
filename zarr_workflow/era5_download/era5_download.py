@@ -536,6 +536,44 @@ def _std_grid(ds, cfg):
     return ds.drop_vars(drop)
 
 
+ERA5_GAP = (pd.Timestamp('1940-01-01T00'), pd.Timestamp('1940-01-01T06'))   # first hours without accumulations
+SIGMA = 5.670374419e-8
+
+
+def fill_era5_start_gap(ds):
+    """ERA5 starts at 1940-01-01 00 UTC, but its accumulated fields come from forecasts started at 06/18 UTC, the
+    first one at 1940-01-01 06 UTC: ssrd, strd and tp have no value at 1940-01-01 00..06 UTC (7 h, CDS and EDH
+    alike). Fill exactly those hours (rila_pirin_zarr/LOG.md 2026-11-10; chosen for Rila-Pirin, check elsewhere):
+      ssrd = 0                                    night in the domain (other years: < 1 W/m2 at 06 UTC)
+      tp   = 0                                    the first valid hours (07-12 UTC) are dry (max 0.012 mm/h)
+      strd = eps * sigma * t2m^4 * 3600           eps per grid cell from 07 UTC, the first valid hour
+    Returns (ds, info); info is None when nothing had to be filled. Raises when one of these variables has NaN
+    outside the gap (a real data problem must never be filled silently)."""
+    acc = [v for v in ('ssrd', 'strd', 'tp') if v in ds.data_vars]
+    if not acc:
+        return ds, None
+    t = pd.DatetimeIndex(ds.time.values)
+    gap = xr.DataArray((t >= ERA5_GAP[0]) & (t <= ERA5_GAP[1]), coords={'time': ds.time}, dims='time')
+    info = {}
+    for v in acc:
+        nan_t = ds[v].isnull().any([d for d in ds[v].dims if d != 'time']).load()
+        if not bool(nan_t.any()):
+            continue
+        if bool((nan_t & ~gap).any()):
+            raise ValueError(f'{v}: NaN outside the ERA5 start gap 1940-01-01 00-06 UTC')
+        if v == 'strd':
+            if 't2m' not in ds.data_vars:
+                raise ValueError('strd gap: t2m needed for the fill')
+            t07 = ERA5_GAP[1] + pd.Timedelta('1h')
+            eps = ds.strd.sel(time=t07) / 3600 / (SIGMA * ds.t2m.sel(time=t07) ** 4)
+            fill = (eps * SIGMA * ds.t2m ** 4 * 3600).drop_vars('time', errors='ignore')
+        else:
+            fill = xr.zeros_like(ds[v])
+        ds[v] = xr.where(ds[v].isnull() & gap, fill, ds[v]).astype(ds[v].dtype).transpose(*ds[v].dims)
+        info[v] = int(nan_t.sum())
+    return ds, (info or None)
+
+
 def convert_cds_plev(path, unit, cfg):
     ds = xr.open_dataset(path, engine='cfgrib', backend_kwargs={'indexpath': ''}, decode_timedelta=True)
     ds = _std_grid(ds, cfg)
@@ -571,7 +609,10 @@ def convert_cds_surf(path, unit, cfg):
     missing = want.difference(have)
     if len(missing):
         raise ValueError(f'{len(missing)} hours missing, first {list(missing[:3])}')
-    return ds[unit['vars']].sel(time=want).astype('float32').load()
+    ds, filled = fill_era5_start_gap(ds.sel(time=want))     # only 1940-01-01 00-06 UTC (accumulations), see there
+    if filled:
+        log.info(f'{unit["id"]}: ERA5 start gap 1940-01-01 00-06 UTC filled, hours per variable {filled}')
+    return ds[unit['vars']].astype('float32').load()
 
 
 def convert_ncar(path, unit, cfg):
