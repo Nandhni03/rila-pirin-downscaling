@@ -1,0 +1,286 @@
+start 2026-11-10 14:39:01; branch fix/aspect-azimuth-convention 0631d84
+TopoPyScale imported from /home/andreiionita27/SurfexCrocus/aspect_fix/TopoPyScale_fix/TopoPyScale/__init__.py
+Run started 2026-11-10 14:39:03; config /home/andreiionita27/SurfexCrocus/aspect_fix/config/config_meridionali_Efix2_2025-01_2025-08.yml
+
+---> DEM file found
+{'latN': 46.0508428738739, 'latS': 44.711963135777545, 'lonW': 22.11225376243332, 'lonE': 25.7348311005784}
+Project lat/lon extent:
+
+	------------------------------
+	|        North:46.1          |
+	|West:22.1          East:25.7|
+	|        South:44.7          |
+	------------------------------
+---> Config loaded
+era5 download no longer automatically done in class decalaration - please declare <mp.get_era5()> in run.py file.
+
+========== compute_dem_param ==========
+
+---> Dataset ds_param.nc found.
+
+---> Extracting DEM parameters (slope, aspect, svf)
+---> File /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/meridionali_Efix2_2025-01_2025-08/outputs/tmp/ds_param.nc saved
+========== compute_dem_param done in 117.3 s
+
+========== extract_topo_param ==========
+---> Centroids file df_centroids.pck exists and loaded
+========== extract_topo_param done in 0.0 s
+
+========== compute_solar_geometry ==========
+
+---> Computing solar geometry
+---> File /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/meridionali_Efix2_2025-01_2025-08/outputs/ds_solar.nc saved
+========== compute_solar_geometry done in 153.0 s
+
+========== compute_horizon (load + sample at centroids) ==========
+---> Horizon file da_horizon.nc exists and loaded
+---> Centroids file df_centroids.pck updated with horizons
+========== compute_horizon (load + sample at centroids) done in 31.7 s
+
+========== get_era5 ==========
+---> ERA5 store /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/era5_600-1000hPa/2025/ERA5.zarr: complete for 2025-01-01 .. 2025-08-31, 14 levels 600-1000 hPa, 13 variables, no NaN
+========== get_era5 done in 0.4 s
+
+========== downscale_climate ==========
+---> Output store down.zarr created (3001 points x 5832 timesteps)
+---> 3001 points to downscale on 14 cores (0 already done), 5832 timesteps
+---> WARNING: Point 0013 is below the 1000.0 hPa geopotential at 25 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0006 is below the 1000.0 hPa geopotential at 35 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0009 is below the 1000.0 hPa geopotential at 1980 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0002 is below the 1000.0 hPa geopotential at 377 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0015 is below the 1000.0 hPa geopotential at 399 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0023 is below the 1000.0 hPa geopotential at 518 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0018 is below the 1000.0 hPa geopotential at 653 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0027 is below the 1000.0 hPa geopotential at 690 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0028 is below the 1000.0 hPa geopotential at 327 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0029 is below the 1000.0 hPa geopotential at 453 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0036 is below the 1000.0 hPa geopotential at 354 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0041 is below the 1000.0 hPa geopotential at 2035 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0051 is below the 1000.0 hPa geopotential at 885 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0054 is below the 1000.0 hPa geopotential at 22 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0049 is below the 1000.0 hPa geopotential at 1832 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0056 is below the 1000.0 hPa geopotential at 143 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0062 is below the 1000.0 hPa geopotential at 771 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0066 is below the 1000.0 hPa geopotential at 1231 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0070 is below the 1000.0 hPa geopotential at 173 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0075 is below the 1000.0 hPa geopotential at 124 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0080 is below the 1000.0 hPa geopotential at 560 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0081 is below the 1000.0 hPa geopotential at 1419 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0084 is below the 1000.0 hPa geopotential at 496 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0086 is below the 1000.0 hPa geopotential at 163 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0093 is below the 1000.0 hPa geopotential at 330 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0099 is below the 1000.0 hPa geopotential at 813 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0098 is below the 1000.0 hPa geopotential at 386 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0097 is below the 1000.0 hPa geopotential at 1975 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0105 is below the 1000.0 hPa geopotential at 26 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0112 is below the 1000.0 hPa geopotential at 1302 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0109 is below the 1000.0 hPa geopotential at 1112 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0110 is below the 1000.0 hPa geopotential at 164 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0107 is below the 1000.0 hPa geopotential at 88 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0120 is below the 1000.0 hPa geopotential at 633 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0124 is below the 1000.0 hPa geopotential at 77 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0126 is below the 1000.0 hPa geopotential at 131 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0132 is below the 1000.0 hPa geopotential at 2 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0138 is below the 1000.0 hPa geopotential at 523 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0141 is below the 1000.0 hPa geopotential at 171 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0142 is below the 1000.0 hPa geopotential at 558 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> 150/3001 points, 58s elapsed, ETA 1101s
+---> WARNING: Point 0156 is below the 1000.0 hPa geopotential at 909 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0163 is below the 1000.0 hPa geopotential at 169 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0162 is below the 1000.0 hPa geopotential at 1260 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0171 is below the 1000.0 hPa geopotential at 2908 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0173 is below the 1000.0 hPa geopotential at 3 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0167 is below the 1000.0 hPa geopotential at 119 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0183 is below the 1000.0 hPa geopotential at 904 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0179 is below the 1000.0 hPa geopotential at 40 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0188 is below the 1000.0 hPa geopotential at 145 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0184 is below the 1000.0 hPa geopotential at 743 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0187 is below the 1000.0 hPa geopotential at 840 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0195 is below the 1000.0 hPa geopotential at 860 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0200 is below the 1000.0 hPa geopotential at 391 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0206 is below the 1000.0 hPa geopotential at 996 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0211 is below the 1000.0 hPa geopotential at 888 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0215 is below the 1000.0 hPa geopotential at 177 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0217 is below the 1000.0 hPa geopotential at 875 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0213 is below the 1000.0 hPa geopotential at 875 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0216 is below the 1000.0 hPa geopotential at 232 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0220 is below the 1000.0 hPa geopotential at 510 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0223 is below the 1000.0 hPa geopotential at 2431 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0221 is below the 1000.0 hPa geopotential at 789 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0228 is below the 1000.0 hPa geopotential at 22 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0234 is below the 1000.0 hPa geopotential at 565 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0237 is below the 1000.0 hPa geopotential at 407 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0238 is below the 1000.0 hPa geopotential at 78 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0241 is below the 1000.0 hPa geopotential at 273 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0243 is below the 1000.0 hPa geopotential at 261 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0252 is below the 1000.0 hPa geopotential at 1024 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0251 is below the 1000.0 hPa geopotential at 252 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0261 is below the 1000.0 hPa geopotential at 1572 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0264 is below the 1000.0 hPa geopotential at 26 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0267 is below the 1000.0 hPa geopotential at 386 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0272 is below the 1000.0 hPa geopotential at 576 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0275 is below the 1000.0 hPa geopotential at 796 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0282 is below the 1000.0 hPa geopotential at 471 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0283 is below the 1000.0 hPa geopotential at 289 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0302 is below the 1000.0 hPa geopotential at 704 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0299 is below the 1000.0 hPa geopotential at 371 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0295 is below the 1000.0 hPa geopotential at 18 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0300 is below the 1000.0 hPa geopotential at 177 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> 300/3001 points, 91s elapsed, ETA 820s
+---> WARNING: Point 0307 is below the 1000.0 hPa geopotential at 461 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0313 is below the 1000.0 hPa geopotential at 125 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0309 is below the 1000.0 hPa geopotential at 312 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0314 is below the 1000.0 hPa geopotential at 222 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0318 is below the 1000.0 hPa geopotential at 1689 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0319 is below the 1000.0 hPa geopotential at 114 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0321 is below the 1000.0 hPa geopotential at 389 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0323 is below the 1000.0 hPa geopotential at 828 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0327 is below the 1000.0 hPa geopotential at 263 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0330 is below the 1000.0 hPa geopotential at 146 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0331 is below the 1000.0 hPa geopotential at 1102 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0340 is below the 1000.0 hPa geopotential at 887 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0344 is below the 1000.0 hPa geopotential at 5050 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0353 is below the 1000.0 hPa geopotential at 362 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0360 is below the 1000.0 hPa geopotential at 41 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0356 is below the 1000.0 hPa geopotential at 161 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0365 is below the 1000.0 hPa geopotential at 927 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0370 is below the 1000.0 hPa geopotential at 931 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0376 is below the 1000.0 hPa geopotential at 1622 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0379 is below the 1000.0 hPa geopotential at 131 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0384 is below the 1000.0 hPa geopotential at 80 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0393 is below the 1000.0 hPa geopotential at 237 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0383 is below the 1000.0 hPa geopotential at 148 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0392 is below the 1000.0 hPa geopotential at 1234 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0394 is below the 1000.0 hPa geopotential at 9 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0399 is below the 1000.0 hPa geopotential at 4504 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0402 is below the 1000.0 hPa geopotential at 86 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0407 is below the 1000.0 hPa geopotential at 12 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0404 is below the 1000.0 hPa geopotential at 250 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0409 is below the 1000.0 hPa geopotential at 6 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0412 is below the 1000.0 hPa geopotential at 45 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0415 is below the 1000.0 hPa geopotential at 1883 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0418 is below the 1000.0 hPa geopotential at 242 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0421 is below the 1000.0 hPa geopotential at 206 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0423 is below the 1000.0 hPa geopotential at 1069 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0426 is below the 1000.0 hPa geopotential at 19 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0441 is below the 1000.0 hPa geopotential at 1826 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0442 is below the 1000.0 hPa geopotential at 454 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0447 is below the 1000.0 hPa geopotential at 1610 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0446 is below the 1000.0 hPa geopotential at 194 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0448 is below the 1000.0 hPa geopotential at 1811 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> 450/3001 points, 125s elapsed, ETA 710s
+---> WARNING: Point 0455 is below the 1000.0 hPa geopotential at 55 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0462 is below the 1000.0 hPa geopotential at 555 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0469 is below the 1000.0 hPa geopotential at 490 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0480 is below the 1000.0 hPa geopotential at 1714 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0483 is below the 1000.0 hPa geopotential at 1087 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0489 is below the 1000.0 hPa geopotential at 142 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0493 is below the 1000.0 hPa geopotential at 137 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0495 is below the 1000.0 hPa geopotential at 888 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0497 is below the 1000.0 hPa geopotential at 2 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0509 is below the 1000.0 hPa geopotential at 56 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0510 is below the 1000.0 hPa geopotential at 18 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0513 is below the 1000.0 hPa geopotential at 200 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0522 is below the 1000.0 hPa geopotential at 2575 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0528 is below the 1000.0 hPa geopotential at 1 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0525 is below the 1000.0 hPa geopotential at 978 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0530 is below the 1000.0 hPa geopotential at 36 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0532 is below the 1000.0 hPa geopotential at 503 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0537 is below the 1000.0 hPa geopotential at 65 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0543 is below the 1000.0 hPa geopotential at 21 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0557 is below the 1000.0 hPa geopotential at 136 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0560 is below the 1000.0 hPa geopotential at 157 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0562 is below the 1000.0 hPa geopotential at 19 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0568 is below the 1000.0 hPa geopotential at 255 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0566 is below the 1000.0 hPa geopotential at 243 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0586 is below the 1000.0 hPa geopotential at 505 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0590 is below the 1000.0 hPa geopotential at 819 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0593 is below the 1000.0 hPa geopotential at 122 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> 600/3001 points, 157s elapsed, ETA 627s
+---> WARNING: Point 0604 is below the 1000.0 hPa geopotential at 874 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0608 is below the 1000.0 hPa geopotential at 19 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0609 is below the 1000.0 hPa geopotential at 178 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0610 is below the 1000.0 hPa geopotential at 26 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0617 is below the 1000.0 hPa geopotential at 342 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0612 is below the 1000.0 hPa geopotential at 535 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0614 is below the 1000.0 hPa geopotential at 837 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0622 is below the 1000.0 hPa geopotential at 594 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0623 is below the 1000.0 hPa geopotential at 521 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0625 is below the 1000.0 hPa geopotential at 22 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0632 is below the 1000.0 hPa geopotential at 8 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0635 is below the 1000.0 hPa geopotential at 86 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0640 is below the 1000.0 hPa geopotential at 693 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0637 is below the 1000.0 hPa geopotential at 647 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0639 is below the 1000.0 hPa geopotential at 382 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0656 is below the 1000.0 hPa geopotential at 342 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0671 is below the 1000.0 hPa geopotential at 28 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0676 is below the 1000.0 hPa geopotential at 150 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0701 is below the 1000.0 hPa geopotential at 1282 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0702 is below the 1000.0 hPa geopotential at 1123 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0695 is below the 1000.0 hPa geopotential at 237 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0710 is below the 1000.0 hPa geopotential at 954 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0717 is below the 1000.0 hPa geopotential at 741 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0715 is below the 1000.0 hPa geopotential at 260 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0713 is below the 1000.0 hPa geopotential at 958 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0727 is below the 1000.0 hPa geopotential at 231 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0725 is below the 1000.0 hPa geopotential at 793 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0730 is below the 1000.0 hPa geopotential at 728 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0731 is below the 1000.0 hPa geopotential at 329 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0732 is below the 1000.0 hPa geopotential at 732 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0733 is below the 1000.0 hPa geopotential at 392 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0741 is below the 1000.0 hPa geopotential at 2059 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0747 is below the 1000.0 hPa geopotential at 53 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0740 is below the 1000.0 hPa geopotential at 2235 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0738 is below the 1000.0 hPa geopotential at 150 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0745 is below the 1000.0 hPa geopotential at 46 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0744 is below the 1000.0 hPa geopotential at 135 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> WARNING: Point 0739 is below the 1000.0 hPa geopotential at 38 of 5832 time steps => values of the lowest level at those time steps (no vertical interpolation)
+---> 750/3001 points, 191s elapsed, ETA 574s
+---> 900/3001 points, 228s elapsed, ETA 531s
+---> 1050/3001 points, 263s elapsed, ETA 489s
+---> 1200/3001 points, 297s elapsed, ETA 446s
+---> 1350/3001 points, 332s elapsed, ETA 405s
+---> 1500/3001 points, 370s elapsed, ETA 370s
+---> 1650/3001 points, 404s elapsed, ETA 331s
+---> 1800/3001 points, 439s elapsed, ETA 293s
+---> 1950/3001 points, 475s elapsed, ETA 256s
+---> 2100/3001 points, 510s elapsed, ETA 219s
+---> 2250/3001 points, 547s elapsed, ETA 183s
+---> 2400/3001 points, 581s elapsed, ETA 146s
+---> 2550/3001 points, 612s elapsed, ETA 108s
+---> 2700/3001 points, 646s elapsed, ETA 72s
+---> 2850/3001 points, 684s elapsed, ETA 36s
+---> 3000/3001 points, 717s elapsed, ETA 0s
+---> 3001/3001 points, 717s elapsed, ETA 0s
+---> Downscaling: 3001 points done this run (0 earlier), 0 failed, 718s wall, 3.2s per point per worker
+---> 187 point(s) lie below the lowest pressure level at some hour and use the no-vertical-interpolation fallback: ['0002', '0006', '0009', '0013', '0015', '0018', '0023', '0027', '0028', '0029', '0036', '0041', '0049', '0051', '0054', '0056', '0062', '0066', '0070', '0075', '0080', '0081', '0084', '0086', '0093', '0097', '0098', '0099', '0105', '0107', '0109', '0110', '0112', '0120', '0124', '0126', '0132', '0138', '0141', '0142', '0156', '0162', '0163', '0167', '0171', '0173', '0179', '0183', '0184', '0187', '0188', '0195', '0200', '0206', '0211', '0213', '0215', '0216', '0217', '0220', '0221', '0223', '0228', '0234', '0237', '0238', '0241', '0243', '0251', '0252', '0261', '0264', '0267', '0272', '0275', '0282', '0283', '0295', '0299', '0300', '0302', '0307', '0309', '0313', '0314', '0318', '0319', '0321', '0323', '0327', '0330', '0331', '0340', '0344', '0353', '0356', '0360', '0365', '0370', '0376', '0379', '0383', '0384', '0392', '0393', '0394', '0399', '0402', '0404', '0407', '0409', '0412', '0415', '0418', '0421', '0423', '0426', '0441', '0442', '0446', '0447', '0448', '0455', '0462', '0469', '0480', '0483', '0489', '0493', '0495', '0497', '0509', '0510', '0513', '0522', '0525', '0528', '0530', '0532', '0537', '0543', '0557', '0560', '0562', '0566', '0568', '0586', '0590', '0593', '0604', '0608', '0609', '0610', '0612', '0614', '0617', '0622', '0623', '0625', '0632', '0635', '0637', '0639', '0640', '0656', '0671', '0676', '0695', '0701', '0702', '0710', '0713', '0715', '0717', '0725', '0727', '0730', '0731', '0732', '0733', '0738', '0739', '0740', '0741', '0744', '0745', '0747']
+========== downscale_climate done in 718.5 s
+
+
+STOPPED AFTER DOWNSCALE (as requested)
+	Command being timed: "../venv/bin/python meridionali_zarr/scripts/run_year_public.py /home/andreiionita27/SurfexCrocus/aspect_fix/config/config_meridionali_Efix2_2025-01_2025-08.yml --stop-after downscale"
+	User time (seconds): 276.23
+	System time (seconds): 183.65
+	Percent of CPU this job got: 43%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 17:32.24
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 11173104
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 56011
+	Minor (reclaiming a frame) page faults: 9253001
+	Voluntary context switches: 19346090
+	Involuntary context switches: 6895
+	Swaps: 0
+	File system inputs: 20852160
+	File system outputs: 9700824
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+exit 0 end 2026-11-10 14:56:33
+/home/andreiionita27/miniconda3/lib/python3.13/multiprocessing/resource_tracker.py:277: UserWarning: resource_tracker: There appear to be 14 leaked semaphore objects to clean up at shutdown: {'/loky-3013949-40gjgd7_', '/loky-3013859-kp_r0jv4', '/loky-3013958-2zrf1fhl', '/loky-3013923-hckaap_p', '/loky-3013968-w8tmc46u', '/loky-3013918-9tt3af0z', '/loky-3013900-99oquz5p', '/loky-3013843-k51ntfur', '/loky-3013874-z39oa3nj', '/loky-3013954-jccsc9yk', '/loky-3013933-vgnuqpit', '/loky-3013854-6idozt7o', '/loky-3013938-qkvyeck1', '/loky-3013838-x1xzzey4'}
+  warnings.warn(

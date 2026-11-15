@@ -1,0 +1,15 @@
+3001 points, 8760 h (2024090100 .. 2025083123) -> 12 chunks, 8 at a time -> /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/crocus_E/2024-2025_hourly_reduced
+12:10:16 chunk forcing files written
+12:12:25 chunk 00: OK (exit 0, 2.1 min); 1 of 12 done
+12:12:25 chunk 01: OK (exit 0, 2.1 min); 2 of 12 done
+12:12:25 chunk 02: OK (exit 0, 2.1 min); 3 of 12 done
+12:12:25 chunk 03: OK (exit 0, 2.1 min); 4 of 12 done
+12:12:25 chunk 04: OK (exit 0, 2.1 min); 5 of 12 done
+12:12:25 chunk 05: OK (exit 0, 2.1 min); 6 of 12 done
+12:12:25 chunk 06: OK (exit 0, 2.1 min); 7 of 12 done
+12:12:43 chunk 07: OK (exit 0, 2.4 min); 8 of 12 done
+12:14:37 chunk 08: OK (exit 0, 2.2 min); 9 of 12 done
+12:14:37 chunk 09: OK (exit 0, 2.2 min); 10 of 12 done
+12:14:37 chunk 11: OK (exit 0, 2.2 min); 11 of 12 done
+12:14:55 chunk 10: OK (exit 0, 2.5 min); 12 of 12 done
+12:14:55 finished in 4.6 min: 12 of 12 chunks OK
