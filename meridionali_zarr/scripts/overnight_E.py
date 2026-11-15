@@ -77,6 +77,11 @@ LEVELS = [600, 650, 700, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
 START_DOWNSCALING = time.time() + max(0, 60 * 60 - (time.time() - 1793127420))   # Agisoft: not before 21:57 (user)
 NCAR_WORKERS = 12                # version 5c: as rila_pirin_zarr (version 4: 2)
 NCAR_BACKOFF_S = 60              # version 5c: as rila_pirin_zarr, 1, 2, 4, 8, 16 min (version 4: 120 s base)
+# version 5f (15 Nov 2026, measured on 2202 successful NCAR requests + ~16,000 failed attempts, see LOG_28Oct2026.md):
+NCAR_TIMEOUT_S = 450             # wait for NCAR's answer (was 600): 99.95 % of successes < 360 s, slowest 470 s;
+                                 # 450 kept as margin for slow days (15 Nov: median success 172 s)
+NCAR_CONNECT_TIMEOUT_S = 20      # opening the connection: was the system limit (~2 min) on every dropped connect
+NCAR_MAX_BACKOFF_S = 240         # retry waits 1, 2, 4, 4, 4 min (was up to 16 min)
 NCAR_STALL_S = 45 * 60
 NCAR_RETRY_PAUSE_S = 15 * 60     # version 5: pause before an NCAR lane retries the same year
 
@@ -119,8 +124,12 @@ def era_cfg(year, source):
     cfg['cds'].update(workers=2, max_items_plev=60000, max_items_surf=60000)
     if source == 'cds':
         cfg['source'] = {'plev': 'cds', 'surf': 'cds'}
-    else:                                       # 5d (user): everything from NCAR; the CDS lane is the backup
-        cfg['source'] = {'plev': 'ncar', 'surf': 'ncar'}
+    else:
+        # 5f (user 15 Nov: "same setup like Nandhni"): pressure levels from NCAR, single levels from the CDS
+        # (1-2 requests per year instead of 84 NCAR OPeNDAP requests; OPeNDAP overloaded since 5 Nov, rila_pirin_zarr/LOG.md)
+        cfg['source'] = {'plev': 'ncar', 'surf': 'cds'}
+        cfg['ncar'].update(timeout_seconds=NCAR_TIMEOUT_S, connect_timeout_seconds=NCAR_CONNECT_TIMEOUT_S,
+                           max_backoff_seconds=NCAR_MAX_BACKOFF_S)
     if source == 'cds':
         f = MZ / 'config' / 'era5' / f'config_era5_meridionali_{year}_cds.yml'
     else:                                       # own folder and name: never matched by other_writer() of the CDS lane

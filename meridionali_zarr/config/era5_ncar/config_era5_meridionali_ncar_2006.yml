@@ -39,7 +39,7 @@ surf_vars:
 - t2m
 source:
   plev: ncar
-  surf: ncar
+  surf: cds
 cds:
   workers: 2
   max_items_plev: 60000
@@ -53,7 +53,9 @@ ncar:
   base_url: https://thredds.rda.ucar.edu/thredds/ncss/grid/files/g/d633000/e5.oper.an.pl
   max_retries: 5
   backoff_seconds: 60
-  timeout_seconds: 600
+  timeout_seconds: 450
+  connect_timeout_seconds: 20
+  max_backoff_seconds: 240
 paths:
   raw: /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/era5_600-1000hPa_ncar/2006/raw
   state: /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/era5_600-1000hPa_ncar/2006/state

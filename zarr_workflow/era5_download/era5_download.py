@@ -31,6 +31,8 @@ How a download works
     failed in the manifest; the run continues. Rerun the same command to retry them.
 """
 import argparse
+import functools
+import http.client
 import itertools
 import json
 import logging
@@ -395,6 +397,41 @@ def ncar_url(cfg, unit):
             f'&accept=netcdf')
 
 
+class _TimedHTTPSConnection(http.client.HTTPSConnection):
+    """HTTPS connection with its own timeout for opening the connection (TCP + TLS) and the normal timeout for
+    waiting on the server's answer. Added 15 Nov 2026 (meridionali_zarr/LOG_28Oct2026.md): from a network where NCAR
+    drops connections, each failed connect otherwise waits for the system limit (~2 min) before the retry."""
+
+    def __init__(self, *args, connect_timeout=None, read_timeout=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._connect_timeout, self._read_timeout = connect_timeout, read_timeout
+
+    def connect(self):
+        self.timeout = self._connect_timeout
+        super().connect()                                  # TCP connect + TLS handshake within connect_timeout
+        self.sock.settimeout(self._read_timeout)           # then the usual wait for the server's answer
+        self.timeout = self._read_timeout
+
+
+class _TimedHTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, connect_timeout, read_timeout):
+        super().__init__()
+        self._ct, self._rt = connect_timeout, read_timeout
+
+    def https_open(self, req):
+        conn = functools.partial(_TimedHTTPSConnection, connect_timeout=self._ct, read_timeout=self._rt)
+        return self.do_open(conn, req, context=self._context)
+
+
+def ncar_open(url, c):
+    """urlopen for NCAR. Optional ncar.connect_timeout_seconds (default: off = one timeout for everything, as before)."""
+    ct = c.get('connect_timeout_seconds')
+    if not ct:
+        return urllib.request.urlopen(url, timeout=c['timeout_seconds'])
+    opener = urllib.request.build_opener(_TimedHTTPSHandler(ct, c['timeout_seconds']))
+    return opener.open(url, timeout=c['timeout_seconds'])
+
+
 def download_ncar(cfg, unit, client=None):
     out = raw_file(cfg, unit)
     if out.exists():
@@ -406,7 +443,7 @@ def download_ncar(cfg, unit, client=None):
         t0 = time.time()
         try:
             part = out.with_name(out.name + '.part')
-            with urllib.request.urlopen(url, timeout=c['timeout_seconds']) as resp, open(part, 'wb') as fh:
+            with ncar_open(url, c) as resp, open(part, 'wb') as fh:
                 shutil.copyfileobj(resp, fh)
             os.replace(part, out)
             stats.update(attempts=attempt + 1, total_s=round(time.time() - t0, 1), bytes=out.stat().st_size)
@@ -417,6 +454,8 @@ def download_ncar(cfg, unit, client=None):
             if attempt == c['max_retries']:
                 raise RuntimeError(f'gave up after {attempt + 1} attempts; last error {msg}')
             wait = c['backoff_seconds'] * 2 ** attempt
+            if c.get('max_backoff_seconds'):               # optional cap (default: off, exponential as before)
+                wait = min(wait, c['max_backoff_seconds'])
             log.warning(f'{unit["id"]}: attempt {attempt + 1} failed ({msg}); retry in {wait}s')
             time.sleep(wait)
 
