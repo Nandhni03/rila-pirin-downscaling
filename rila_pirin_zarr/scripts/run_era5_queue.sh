@@ -10,10 +10,11 @@
 set -uo pipefail
 R=rila_pirin_zarr; E5=$R/data/era5_600-1000hPa
 NAME=${1:?lane name}; Y0=${2:?first year}; Y1=${3:?last year}
+STEP=1; [ "$Y0" -gt "$Y1" ] && STEP=-1     # Y0 > Y1: newest year first (1984 -> 1940, added 2026-11-10)
 stamp() { date -u +'%Y-%m-%d %H:%M:%S UTC'; }
 order() {   # started years first, then the rest, ascending
-  for y in $(seq "$Y0" "$Y1"); do [ -d "$E5/$y" ] && echo "$y"; done
-  for y in $(seq "$Y0" "$Y1"); do [ -d "$E5/$y" ] || echo "$y"; done
+  for y in $(seq "$Y0" "$STEP" "$Y1"); do [ -d "$E5/$y" ] && echo "$y"; done
+  for y in $(seq "$Y0" "$STEP" "$Y1"); do [ -d "$E5/$y" ] || echo "$y"; done
 }
 one_year() {
   local Y=$1 E=$R/config/era5/config_era5_$1.yml D=$E5/$1

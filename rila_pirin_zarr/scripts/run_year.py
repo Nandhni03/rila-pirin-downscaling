@@ -44,6 +44,27 @@ from TopoPyScale import topo_scale_zarr as tz  # noqa: E402
 from TopoPyScale import topoclass as tc  # noqa: E402
 from TopoPyScale import topo_utils as tu  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'zarr_workflow' / 'era5_download'))
+from era5_download import ERA5_GAP, fill_era5_start_gap  # noqa: E402
+
+
+def fill_edh_start_gap(store):
+    """Fill the ERA5 start gap (era5_download.fill_era5_start_gap) inside an assembled ERA5 Zarr store, in place.
+    Only the first hours are read and written (region), so this costs ~0 s for the years that do not hold 1940-01-01."""
+    ds = xr.open_zarr(store)
+    t = pd.DatetimeIndex(ds.time.values)
+    if t[0] > ERA5_GAP[1]:
+        return
+    n = int(np.searchsorted(t, ERA5_GAP[1] + pd.Timedelta('1h'))) + 1     # gap + the first valid hour (strd fill)
+    acc = [v for v in ('ssrd', 'strd', 'tp', 't2m') if v in ds.data_vars]
+    head = ds[acc].isel(time=slice(0, n)).load()
+    head, info = fill_era5_start_gap(head)
+    if not info:
+        return
+    out = head[[v for v in info]].drop_vars([c for c in head.coords if c != 'time'] + ['time'], errors='ignore')
+    out.to_zarr(store, region={'time': slice(0, n)}, mode='r+')
+    print(f'---> ERA5 start gap 1940-01-01 00-06 UTC filled in {store.name}: hours per variable {info}', flush=True)
+
 
 def main():
     p = argparse.ArgumentParser()
@@ -82,6 +103,9 @@ def main():
               sel[0][0], sel[-1][1], era.get('plevels'))     # the months this run will downscale
     else:
         timer('get_era5', mp.get_era5)
+        # EDH store, rebuilt from the cached blocks by every get_era5: fill the ERA5 start gap (1940-01-01 00-06 UTC,
+        # no accumulations) in place. No-op for every other year. LOG.md 2026-11-10.
+        timer('fill_era5_start_gap', fill_edh_start_gap, mp.config.climate.path / era['zarr_store'])
     year_timings = dict(timer.t)
     # Free memory: after a fresh computation Topoclass holds the full horizon (float64, ~7 GB) and
     # terrain arrays in memory (~20 GB RSS). The downscaler only needs the horizon angles already
