@@ -110,9 +110,10 @@ def era_cfg(year, source):
     base = ERA_DIRS[source] / str(year)
     cfg['paths'] = {k: str(base / k) for k in ('raw', 'state', 'logs')}
     cfg['paths']['store'] = str(base / 'ERA5.zarr')
-    t = xr.open_zarr(EDH_STORE).time.values
-    if t.min() <= np.datetime64(f'{year}-01-01') and t.max() >= np.datetime64(f'{year}-12-31T23'):
-        cfg['paths']['edh_store'] = str(EDH_STORE)                  # cross-check at the 5 shared levels
+    if EDH_STORE.exists():                     # 13 Nov 2026: EDH store deleted on 12 Nov (user) -> cross-check optional
+        t = xr.open_zarr(EDH_STORE).time.values
+        if t.min() <= np.datetime64(f'{year}-01-01') and t.max() >= np.datetime64(f'{year}-12-31T23'):
+            cfg['paths']['edh_store'] = str(EDH_STORE)              # cross-check at the 5 shared levels
     cfg['ncar']['workers'] = NCAR_WORKERS
     cfg['ncar']['backoff_seconds'] = NCAR_BACKOFF_S
     cfg['cds'].update(workers=2, max_items_plev=60000, max_items_surf=60000)
@@ -346,7 +347,13 @@ def other_writer(year):
     return r.stdout.split()
 
 
+NO_CDS = os.environ.get('NO_CDS') == '1'        # user 15 Nov: after 2008, CDS only as a last resort -> NCAR downloads
+
+
 def lane_cds(years):
+    if NO_CDS:
+        log('CDS lane: off (NO_CDS=1; CDS only as a last resort). Downscaling lane on: years completed by the NCAR lanes')
+        return
     while not stop.is_set():
         y, helped = claim_year(years, 'cds', 'cds lane', helping=True)
         if y is None:

@@ -59,6 +59,5 @@ paths:
   state: /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/era5_600-1000hPa_ncar/2007/state
   logs: /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/era5_600-1000hPa_ncar/2007/logs
   store: /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/era5_600-1000hPa_ncar/2007/ERA5.zarr
-  edh_store: /home/andreiionita27/TopoPyScale-repo-github/downscaling/meridionali_zarr/data/era5_meridionali/ERA5.zarr
 store:
   time_chunk: 744
