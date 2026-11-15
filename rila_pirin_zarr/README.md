@@ -27,7 +27,7 @@ in the alpine zone).
 | DEM | FABDEM V1-2, 30 m, EPSG:32634 (4233 x 3998 px), rectangle mask 9,686,304 px |
 | clusters | k = 1000 in groups <800 / 800-1500 / 1500-2000 / >=2000 m, density coefficients 0.5 / 1 / 1.5 / 2 -> 149 / 427 / 241 / 185 |
 | features | x 1, y 1, elevation 6, slope 1, aspect_cos 2, aspect_sin 2, svf 1; minibatch k-means, seed 2 |
-| centroid aspect | circular mean atan2(sin, cos) (the fork's arithmetic mean flips north-facing clusters; kept as `aspect_arith`) |
+| centroid aspect | circular mean atan2(sin, cos) (aspect convention 0 = south, + east; the fork's arithmetic mean wraps at south and flips south-facing clusters; kept as `aspect_arith`) |
 | ERA5 | pressure levels: NCAR d633000 NCSS, 600-1000 hPa (14 levels); 7 single-level variables: CDS, one request per year (NCAR OPeNDAP for 2005/2020/2025, overloaded since 2026-11-05), 1985-2025 |
 | EDH series | same terrain and clusters, ERA5 from Earth Data Hub, 600/700/850/925/1000 hPa: fast, separate product (LOG.md 2026-11-06) |
 | products | `down.zarr` (hourly), `daily.zarr` (daily stats), `t_mean_monthly_YYYY.tif` (12 bands, viewing only) |

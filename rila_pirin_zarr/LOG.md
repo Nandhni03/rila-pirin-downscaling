@@ -761,3 +761,99 @@ surface data. Outputs: data/validation/{ncar,edh}/ and their plots/. Run log: sc
   That gives a damped daily cycle. This is further evidence that the vertical-fallback fix is needed.
 - Conclusion for both series: TopoSCALE adds value above the ERA5 orography, and the low valleys are its weak spot.
   NCAR ≥ EDH (more levels); the difference matters only below ~1000 hPa.
+
+## 2026-11-15: Andrei's repo synced (andrei/main 4071ae7): what his fixes mean for us. The "azimuth bug" of 11 Nov was a misreading.
+
+**Source.** `git fetch andrei` (read-only). His aspect-fix write-up is new:
+- `meridionali_zarr/surfex_crocus/aspect_fix/CHANGELOG_aspect_fix.md` and `meridionali_zarr/CHANGES_aspect_fix_thesis.md`.
+- Checks are in `.../aspect_fix/checks/`.
+- His fixed TopoPyScale is NOT in any repo: branch fix/aspect-azimuth-convention, main = bbd0296, in a worktree on his
+  machine (`~/SurfexCrocus/aspect_fix/TopoPyScale_fix`; not on this machine). We have the description, not the code.
+
+**His conclusion: no north/south swap.** The aspect, solar azimuth and horizon all use 0 = south, positive towards
+east. He checked this with synthetic DEMs and an independent pvlib computation.
+
+**Checked on our terrain (ds_param.zarr, a 400x400 px window, slope > 15 deg).** I compared the stored aspect with
+the downslope direction computed from the elevation gradient:
+- Read as "bearing from north": median difference 93 deg, only 12 % within 20 deg.
+- Read as "0 = south, + east" (bearing = 180 - aspect): median difference 2.3 deg, 100 % within 20 deg.
+
+So the aspect is 0 = south, the same convention as the solar azimuth in solar_geom.py (180 - pvlib), and
+`cos(azimuth - aspect)` in topo_scale_zarr.py is consistent. **There is no azimuth bug.** The entry of 2026-11-11
+("second aspect bug found") read the aspect as degrees from north.
+- Its DJF table is correct, but the labels are wrong: "N" clusters (aspect ~ 0) are really south-facing, and "S" are
+  north-facing.
+- Relabelled, the direct SW is S 92 > W 64 > E 47 > N 20 W/m2, which is physically right at 42 N. This matches
+  Andrei's order.
+- The README line "the fork's arithmetic mean flips north-facing clusters" should read "south-facing" (0 = south
+  wraps at south).
+
+**Andrei's real fixes, against our fork (uncommitted working tree, live at /opt/TopoPyScale):**
+
+| # | Problem (Andrei) | In our fork / runs? |
+|---|---|---|
+| 1 | cluster aspect = arithmetic mean of angles; wraps at south | **already fixed here on 2026-11-05.** df_centroids aspect = circular mean of the pixel sin/cos (checked now: max 3.7 deg from atan2 of the cluster's mean sin/cos, median 0.45 deg = storage quantisation; 112 clusters differ > 45 deg from the arithmetic mean = the ones the bug would have hit). The "aspect_arith" column is kept |
+| 2 | SW_direct > SWtoa at low sun (spikes to ~2900 W/m2) | not fixed (no cap in topo_scale_zarr.py). We saw max 1920 W/m2 on 11 Nov |
+| 3 | sun position 30 min late (ERA5 SW = mean of the past hour, sun computed at the stamp) | not fixed: W > E by ~10-17 W/m2 in DJF here too (64 vs 47 above) |
+| 4 | below-1000 hPa fallback decided over the whole period | not fixed: affects t, q, p, u, v, LW at the ~29 lowest clusters and Sandanski. His fix 0631d84: per time step, interpolate when the point is inside the levels; lowest-level values only at the steps below all levels |
+| 5 | to_surfex aspect metadata | not used by us |
+
+**Consequences.**
+- SW in our 172 downscaled years has problems 2 and 3, but not an N/S swap. Temperature has problem 4 at the low
+  clusters only.
+- The re-downscale we planned is still worth doing, but for 2 + 3 + 4, not for an azimuth bug.
+- We need his code (he should push the branch to a TopoPyScale fork), or we port it ourselves from his description.
+  Fix 2 is also upstream TopoPyScale commit 48c07bd. All three are small.
+- Then test on the station point runs (minutes per year) before re-downscaling the full series.
+
+## 2026-11-15 ~16:30 UTC: decisions and sync plan (user: "drop EDH", "be in sync and take what's best from everywhere")
+
+**Decision: EDH dropped, from now on NCAR only.** NCAR has 14 pressure levels (600-1000 hPa) against EDH's 5, is
+slightly better in the validation, and is easier to defend. What was done:
+- The EDH point-run loop was stopped at 1996. config/points_edh and data/points/{runs,logs}_edh (created today)
+  were deleted. points_setup.py and points_validation.py are now NCAR only.
+- Kept on disk for now, not used further: data/runs_edh, data/era5_edh, config/years_edh, results/edh_5levels.
+  The EDH validation outputs in data/validation/edh also stay. Delete them once NCAR v2 (with the fixes) is done.
+
+**State of the code, as of 15 Nov.**
+
+| Where | What | Status |
+|---|---|---|
+| Project repo rila-pirin-downscaling | origin (Nandhni03) = andrei/main = cb51111 | in sync. Andrei's merge 4071ae7 had turned 69 files outside meridionali_zarr/rila_pirin_zarr into CRLF; the merge cb51111 keeps LF (content otherwise identical, checked with --ignore-cr-at-eol) |
+| TopoPyScale fork (Nandhni03/TopoPyScale_Bulgaria_Rila_Pirin_Mountains) | GitHub main = 7d54b9a (1 Oct) | **the code that made all 172 runs is NOT committed**: 9 modified files + tests/test_zarr_caches.py in the working tree (Zarr caches, year store filled month by month, resumable store, ...) |
+| Andrei's fixes (branch fix/aspect-azimuth-convention, main bbd0296, based on 7d54b9a) | only on his machine | **not pushed anywhere**, checked with git ls-remote: the fork has main only, and he has no TopoPyScale fork. The downscaling repo holds his changelog and checks, not the code |
+| Upstream ArcticSnow/TopoPyScale | 10 commits since our fork point 8668a5b (4-10 Nov) | 48c07bd SW_direct cap (= Andrei's fix 2); 783efc4 humidity overwrite, fe8e5e0 precip `{}`, 89fe31a 3h/6h timestep (we fixed these ourselves on 30 Sep); cc8b8ca/d38204e metadata; 6aa2fe9 to_musa |
+
+**Bug overview (who fixed what, and how well):**
+
+| Bug | Fixed by | Quality |
+|---|---|---|
+| Clustering mask applied to the wrong pixels (upstream) | us, fork, 30 Sep | verified: map/centroid correlation -0.08 -> 1.000 |
+| 8 zarr-downscaler bugs (q overwritten, precip `{}`, accumulations, ...) | us, fork, 30 Sep (upstream fixed 3 of them on 5-10 Nov) | parity test: 16 variables within 1e-5 of the classic path |
+| Cluster aspect = arithmetic mean | us (prepare_terrain.py, 5 Nov); Andrei in the fork code (c3cdeda) | verified today (max 3.7 deg from the circular mean). Ours is in the project script only, not in the fork |
+| ERA5 start gap 1940-01-01 00-06 | us, 10 Nov | verified (QA, LW 199-201 W/m2) |
+| Raw ERA5 files failing conversion | us, 7 Nov | works (retries) |
+| Station spikes | us, 12 Nov | 16 h removed, real cold spells kept |
+| "Azimuth / N-S swap" (our 11 Nov diagnosis) | - | **not a bug** (Andrei; confirmed on our terrain today) |
+| SW_direct > SWtoa | Andrei deaa6a9 = upstream 48c07bd | his checks: max 2866 -> 924 W/m2. **Missing here** |
+| Sun 30 min late | Andrei 419d085 | his checks: W-E difference 12-19 % -> 2-4 %. **Missing here** |
+| Below-1000-hPa fallback per whole period | Andrei 0631d84 + bbd0296 | his tests 5/5, period independence verified. **Missing here.** It fixes the inconsistency, not the valley physics (no extrapolation below the lowest level) |
+| ds_solar.zarr packed to 10 bits (int16), so a resumed month reads rounded solar geometry | nobody | open: store float32 before the re-run |
+| A month is marked done before it has passed QA | nobody | open: rule in this LOG (2026-11-10) |
+| TopoPyScale direct SW 28-37 % below the clear-sky pvlib beam (Andrei's check) | - | open; Andrei: the ERA5 direct/diffuse split, not geometry. Not proven |
+
+**Worth taking from Andrei's meridionali_zarr/scripts** (they read stores only):
+- lapse_geotiff_year.py: per-pixel lapse-adjusted daily temperature GeoTIFFs = our validation step 4.
+- check_year_fixed.py: SW sector order in DJF, NaN, time axis, SW_direct max, per year.
+- check_year_boundaries.py: 31 Dec -> 1 Jan jumps.
+All three are to be adapted to rila_pirin_zarr paths and the NCAR series.
+
+**Plan, in order:**
+1. Commit the fork working tree as it is and tag it (rila-pirin-ncar-v1 = the code of the current 86 NCAR years).
+2. Andrei pushes fix/aspect-azimuth-convention to the fork (he needs collaborator access to the fork repo too).
+3. Integrate on a new fork branch: upstream main (take 48c07bd and the metadata commits; keep our versions where
+   we already fixed the same thing), then Andrei's branch, then our fixes (ds_solar float32). Run the tests: parity,
+   test_sw_geometry, test_vertical_interp, test_zarr_caches.
+4. Test on the station point runs (NCAR, ~2 min/year): Sandanski and the valleys before/after, SW checks.
+5. Re-downscale NCAR 1940-2025 fresh (no resumed months), ~19 h. QA + check_year_fixed + year boundaries.
+6. Validation rerun; correction test; step 4 maps (lapse_geotiff_year.py).
