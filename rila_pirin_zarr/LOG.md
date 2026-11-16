@@ -857,3 +857,144 @@ All three are to be adapted to rila_pirin_zarr paths and the NCAR series.
 4. Test on the station point runs (NCAR, ~2 min/year): Sandanski and the valleys before/after, SW checks.
 5. Re-downscale NCAR 1940-2025 fresh (no resumed months), ~19 h. QA + check_year_fixed + year boundaries.
 6. Validation rerun; correction test; step 4 maps (lapse_geotiff_year.py).
+
+## 2026-11-15 ~16:40 UTC: point validation, the authors' way (NCAR, station points 1959-2025)
+
+**Point runs.** NCAR 1959-2017 were added to the existing 2018-2025: 59 years, all exit 0, 12/12 months, ~2 min per
+year, 8 cores.
+
+**Script.** New `scripts/points_validation.py`, output in data/validation/ncar/points/.
+- Per station, the authors' figure (topo_compare.obs_vs_downscaled): `obs_vs_down_<name>_<id>.png`. It has hourly 2D
+  histograms of obs vs ERA5+lapse and obs vs TopoSCALE point, with a 1:1 line, the regression obs = a + b*model, and
+  N/r/RMSE/bias. Below are the daily-mean time series and the 30-day mean of model - obs.
+- RMSE is computed correctly: topo_compare's formula `sqrt(sum(diff)**2/n)` is not an RMSE.
+- Also `points_stats.csv`, `points_rmse.png`.
+
+**Daily t_mean RMSE (K), point runs:**
+- Musala 1964-2025: TopoSCALE 1.39, ERA5+lapse 3.14.
+- Sandanski 1959-2025: TopoSCALE 2.16, ERA5+lapse 1.51.
+- 2018-2025: same pattern as before. TopoSCALE is better at Musala, Malyovitsa, Ortsevo, Obidim, Grashevo and
+  Pletena, and worse in the valleys.
+
+**Correction test (A3).** The authors' trend + seasonal correction, fitted on train and scored on test. Contiguous
+blocks; the 80/20 split was dropped (user, 15 Nov). Musala/Sandanski are fitted only on the reliable 1980-2025:
+leave one decade out inside it, and each older decade (1959-69, 1970s) is tested with a fit on all of 1980-2025.
+METER.AC: leave one year out.
+
+| Station | ERA5+lapse | ERA5+lapse corr. | TopoSCALE | TopoSCALE corr. |
+|---|---|---|---|---|
+| Musala, decades inside 1980-2025 | 3.15 | 2.35 | 1.39 | **1.06** |
+| Musala, older decades (fit 1980-2025) | 3.03 | 2.32 | 1.53 | **1.09** |
+| Sandanski, decades inside 1980-2025 | 1.50 | **1.12** | 2.19 | 1.82 |
+| Sandanski, older decades (fit 1980-2025) | 1.48 | **1.21** | 1.99 | 1.71 |
+
+- **The correction transfers to the older, sparser era.** Musala 1.53 -> 1.09 K on 1959-1979 with a fit on
+  1980-2025 only. So a correction fitted on reliable years could be applied to 1940-1979.
+- **It does not change the ranking.** In the valleys, corrected ERA5+lapse stays better than corrected TopoSCALE
+  (Sandanski 1.12 vs 1.82). On the mountains, corrected TopoSCALE is best (Musala 1.06, Ortsevo 1.01, Obidim 1.07).
+- With only 8 years of METER.AC data it can overfit. The correction made TopoSCALE worse at Breznitsa (1.60 -> 1.97)
+  and Pletena (1.20 -> 1.62), the two stations where TopoSCALE was already good.
+- So a correction is only worth it per station or per elevation class, and only where TopoSCALE is biased. This is a
+  decision for later, after the fixed re-run.
+- Small fix afterwards: the time series no longer draws lines across data gaps.
+
+## 2026-11-15 ~16:00-16:50 UTC: fixes ported (fork branch integrate-fixes), tested, folder reorganised, NCAR v2 started
+
+**Why we ported ourselves:** Andrei cannot push his branch now (user). Ported from his CHANGELOG plus upstream
+48c07bd. Fork branch `integrate-fixes` (from main 14a4de2 = tag rila-pirin-ncar-v1); not committed (user commits).
+
+| Change | Files | Source |
+|---|---|---|
+| Vertical interpolation per time step: interpolate wherever the point is between two levels; lowest-level values only at the steps below every level | topo_utils.vertical_interp_plev (new), topo_scale_zarr.py, topo_scale.py (classic, keeps the parity test meaningful) | Andrei 0631d84 (re-implemented) |
+| SW_direct capped at SWtoa before ka | topo_scale_zarr.py, topo_scale.py | upstream 48c07bd (= Andrei deaa6a9) |
+| Sun position at t - tstep/2 (`get_solar_geom(mid_interval=True)`, default), labels kept at t | solar_geom.py | Andrei 419d085 (re-implemented) |
+| Solar cache stored unpacked float32 (was int16, 10 bits) | solar_geom.py | ours (LOG 2026-11-10) |
+
+Not taken from upstream: 783efc4 / fe8e5e0 / 89fe31a. We fixed the same things ourselves on 30 Sep and our versions
+are parity-tested. Also not taken: cc8b8ca / d38204e (metadata, NetCDF outputs only) and 6aa2fe9 (to_musa, unused).
+Andrei's circular cluster aspect (c3cdeda) is not needed: prepare_terrain.py does it for this project since 5 Nov.
+
+**Evidence that mid-interval is right for OUR ERA5** (cell 41.75 N 23.5 E). Clear-sky GHI correlation is best at
+t - 30 min:
+- 2010 (CDS): 0.868 / 0.872 / 0.838 at t, t-30 min, t-60 min.
+- 2005 (NCAR single levels): 0.897 / 0.899 / 0.862.
+- The SW-weighted daily centroid of the stamps is +0.37-0.39 h after solar transit.
+- So radiation at stamp t is the mean of the past hour, in both sources (as Andrei found: +0.32 h).
+
+**Tests (fork, in the container):**
+- All 36 existing tests pass, including the zarr-vs-classic parity test.
+- New tests/test_vertical_interp.py (6), all pass: bit-identical to the former interpolation at bracketed steps, and
+  to the former fallback at steps below every level; independent of the period; continuous at the switch; error
+  above all levels.
+- New tests/test_solar_geom_fixes.py (4), all pass: mid-interval = pvlib at t - 30 min; mid_interval=False = the
+  old behaviour; the cache reads back bit-identical as float32; the cap removes negative ka.
+- Total: 46 passed.
+
+**Point test, 2020, v2 vs v1** (data/points/runs_v2 vs runs):
+- t is unchanged at every station except Sandanski (+0.49 K mean, up to 1.5 K), the only point that is below z(1000)
+  at times. Its formerly forced hours are now interpolated.
+- Consequence: the old fallback (the colder level above) had partly hidden Sandanski's warm bias, which will now grow
+  by ~0.5 K. This is honest: the valley problem is TopoSCALE's, and the fix removes an inconsistency, not that
+  problem.
+- SW: a few W/m2 per point, opposite sign on E- and W-facing slopes (the sun shift).
+
+**Folder reorganised (user: "organise all the files").** scripts/ split into:
+- pipeline/: dataset; plus new check_year.py (adapted from Andrei's check_year_fixed.py) and check_new_years.sh.
+- validation/: stations, ERA5 baseline, point runs; run_points.sh now in the repo.
+- maps/: qgis_examples.py (new; lapse method of Andrei's lapse_map_test.py).
+- archive/: run_era5_lane.sh.
+- All internal paths were updated (parents[1] -> parents[2], run_year -> zarr_workflow parents[3], usage lines).
+  Tested by a v2 point year from the new paths.
+- Configs: new years_v2/ and points_v2/. They are copies of years/ and points/ that change only the output folder,
+  made with sed. points_setup.py has a 'ncar_v2' entry for the same.
+- results/: ncar_v2 (final) and ncar_v1. EDH is no longer linked: the old ncar_14levels/edh_5levels link folders
+  were removed (links only); update_results.py was rewritten for v1/v2.
+- README.md was rewritten.
+- The old update_results refresher (old path) was stopped and restarted from the new path.
+
+**Started 16:39 UTC (detached in the container):**
+- `run_downscale_all.sh 2025 1940 v2`, newest first, ~13 min/year, ~19 h. Log: data/logs/downscale_all_v2_20261115.log.
+- `run_points.sh v2 1959 2025`.
+- `check_new_years.sh v2 1940 2025`: check_year.py per finished year -> data/logs/check_v2/summary.log.
+- update_results --every 600.
+
+**check_year.py on v1 2024**, as a reference:
+- DJF SW sector order S > W > E > N in every class, so the aspect is right.
+- W - E = +12 to +29 % (the sun lag).
+- SW_direct max 1991 W/m2: FAIL, as expected. v2 must pass both.
+
+### 2026-11-15 23:00 UTC: v2 checkpoint (overnight monitoring)
+- v2 downscale: 2025-1997 DONE (29 years), 1996 running, ~12-14 min per year; no RETRIED/FAILED.
+- check_year.py: 29/29 ALL PASS. DJF SW order holds in every class; SW_direct max 971-1014 W m-2 (v1 up to 1774).
+- v2 point runs (config/points_v2): 1959-2025 all 67 years 12/12 months, every run exit 0 (finished 19:26 UTC).
+- QGIS examples 2024 (t_mean cluster + lapse Jan/Jul, SW_DJF, dSW_DJF v2-v1, dt v2-v1): 7 files, 160 MB, all checks OK
+  (sampled max |diff| < 1e-5, nodata exactly outside mask). dSW_DJF range -34..+24 W m-2; dt range 0..+0.61 K
+  (warming only, low clusters: the per-step fallback). 1952-08 and 1942-01 follow when those years are DONE.
+- Monitoring watcher bug (mine, scratchpad only): `grep -c ... || echo 0` returned "0\n0", so the CHECK FAILED test
+  never fired. Verified by hand that summary.log has no FAILED; fixed and restarted.
+
+### 2026-11-16 05:00 UTC: v2 checkpoint
+- 2025-1966 DONE (60 years), 1965 running; check_year.py 60/60 ALL PASS, no RETRIED/FAILED. SW_direct max stays 970-1015 W m-2.
+
+### 2026-11-16 10:30 UTC: NCAR v2 complete, checked and validated
+**Series.** 1940-2025, 86/86 DONE (2025 started 16:39 UTC 15 Nov, 1940 DONE 10:05 UTC 16 Nov, ~12-14 min per year), 0
+RETRIED/FAILED. check_year.py 86/86 ALL PASS (months, time axis, no NaN, DJF SW order S > E,W > N in every elevation
+class, SW_direct max 970-1015 W m-2 in every year; v1 reached 1774).
+**Year boundaries** (new scripts/pipeline/check_year_boundaries.py, adapted from A. Ionita): 85 boundaries x 7 variables,
+none flagged. t step at 1 Jan 00:00: median of the per-boundary maxima 0.49 K, largest 2.70 K (1947->1948), against a
+typical largest ordinary hourly step on 31 Dec of 1.52 K. -> data/logs/check_v2/year_boundaries.csv.
+**Validation v2 vs v1** (station_compare, station_plots, era5_baseline, points_validation; data/validation/ncar_v2/,
+log data/logs/validation_v2.log):
+- Every station except Sandanski is unchanged to 0.01 K in bias and RMSE (t_mean, t_min, t_max). Expected: the only
+  temperature change of v2 is the per-step vertical fallback, which acts on clusters below ~310 m only.
+- Sandanski (207 m), 1959-2025 daily: t_mean bias +1.02 -> +1.45 K, RMSE 2.16 -> 2.45 K; t_max bias -2.00 -> -1.58,
+  t_min +3.50 -> +3.95. The v1 fallback (whole-run, to the lowest level) cooled this cluster by accident; v2 is the
+  consistent value. It does not change any conclusion: in the valleys ERA5 + lapse (1.51) is still better than TopoSCALE.
+- Point-run correction CV, Sandanski: TopoSCALE corrected 1.82 -> 1.84 K (fit 1980-2025, leave one decade out) and
+  1.71 -> 1.72 K (older decades). The trend + seasonal correction absorbs the shift. Musala identical (1.06 / 1.09).
+**QGIS examples:** all 11 files written and checked (259 MB): t_mean cluster + lapse for 2024-01, 2024-07, 1952-08
+(hottest month), 1942-01 (coldest); SW_DJF_2024, dSW_DJF_2024 v2-v1, dt_2024 v2-v1.
+**Decision:** NCAR v2 is the final dataset (results/ncar_v2). v1 (data/runs, 88 GB) and EDH (data/runs_edh +
+data/era5_edh, ~96 GB) can be deleted; not done, waiting for the user's go.
+**Open:** make_configs.py still writes v1-style configs (years_v2 / points_v2 are copies); choose the station
+correction (per station vs per elevation class).
